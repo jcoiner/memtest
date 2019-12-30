@@ -75,7 +75,7 @@ volatile short	btflag = 0;
 volatile int	test;
 short	        restart_flag;
 bool	        reloc_pending = FALSE;
-uint8_t volatile stacks[MAX_CPUS][STACKSIZE];
+uint8_t volatile stacks[MAX_CPUS][STACKSIZE_BYTES];
 int 		bitf_seq = 0;
 char		cmdline_parsed = 0;
 struct 		vars variables = {};
@@ -235,7 +235,7 @@ switch_to_main_stack(unsigned cpu_num)
    
 	stackAddr = (uint8_t *) &stacks[cpu_num][0];
 
-	stackTop  = stackAddr + STACKSIZE;
+	stackTop  = stackAddr + STACKSIZE_BYTES;
    
 	src = (uintptr_t*)&boot_stack_top;
 	dst = (uintptr_t*)stackTop;
@@ -389,396 +389,399 @@ void clear_screen()
  * we relocate. */
 void test_start(void)
 {
-	int my_cpu_num, my_cpu_ord, run;
+    int my_cpu_num, my_cpu_ord, run;
 
-	/* If this is the first time here we are CPU 0 */
-	if (start_seq == 0) {
-		my_cpu_num = 0;
-	} else {
-		my_cpu_num = smp_my_cpu_num();
-	}
-	/* First thing, switch to main stack */
-	switch_to_main_stack(my_cpu_num);
+    /* If this is the first time here we are CPU 0 */
+    if (start_seq == 0) {
+        my_cpu_num = 0;
+    } else {
+        my_cpu_num = smp_my_cpu_num();
+    }
+    /* First thing, switch to main stack */
+    switch_to_main_stack(my_cpu_num);
 
-	/* First time (for this CPU) initialization */
-	if (start_seq < 2) {
+    /* First time (for this CPU) initialization */
+    if (start_seq < 2) {
 
-	    /* These steps are only done by the boot cpu */
-	    if (my_cpu_num == 0) {
-		my_cpu_ord = cpu_ord++;
-		smp_set_ordinal(my_cpu_num, my_cpu_ord);
-		parse_command_line();
-		clear_screen();
-		/* Initialize the barrier so the lock in btrace will work.
-		 * Will get redone later when we know how many CPUs we have */
-		barrier_init(1);
-		btrace(my_cpu_num, __LINE__, "Begin     ", 1, 0, 0);
-		/* Find memory size */
-		 mem_size();	/* must be called before initialise_cpus(); */
-		/* Fill in the CPUID table */
-		get_cpuid();
-		/* Startup the other CPUs */
-		start_seq = 1;
-		//initialise_cpus();
-		btrace(my_cpu_num, __LINE__, "BeforeInit", 1, 0, 0);
-		/* Draw the screen and get system information */
-	  init();
+        /* These steps are only done by the boot cpu */
+        if (my_cpu_num == 0) {
+            my_cpu_ord = cpu_ord++;
+            smp_set_ordinal(my_cpu_num, my_cpu_ord);
+            parse_command_line();
+            clear_screen();
+            /* Initialize the barrier so the lock in btrace will work.
+             * Will get redone later when we know how many CPUs we have */
+            barrier_init(1);
+            btrace(my_cpu_num, __LINE__, "Begin     ", 1, 0, 0);
+            /* Find memory size */
+            mem_size();	/* must be called before initialise_cpus(); */
+            /* Fill in the CPUID table */
+            get_cpuid();
+            /* Startup the other CPUs */
+            start_seq = 1;
+            //initialise_cpus();
+            btrace(my_cpu_num, __LINE__, "BeforeInit", 1, 0, 0);
+            /* Draw the screen and get system information */
+            init();
 
-		/* Set defaults and initialize variables */
-		set_defaults();
+            /* Set defaults and initialize variables */
+            set_defaults();
+
+            /* Setup base address for testing, 1 MB */
+            win0_start = 0x100;
+
+            /* Set relocation address to 32Mb if there is enough
+             * memory. Otherwise set it to 3Mb */
+            /* Large reloc addr allows for more testing overlap */
+            if ((ulong)vv->pmap[vv->msegs-1].end > 0x2f00) {
+                high_test_adr = 0x2000000;
+            } else {
+                high_test_adr = 0x300000;
+            } 
+            win1_end = (high_test_adr >> 12);
+
+            /* Adjust the map to not test the page at 939k,
+             *  reserved for locks */
+            vv->pmap[0].end--;
+
+            find_ticks_for_pass();
+        } else {
+            /* APs only, Register the APs */
+            btrace(my_cpu_num, __LINE__, "AP_Start  ", 0, my_cpu_num,
+                   cpu_ord);
+            smp_ap_booted(my_cpu_num);
+            /* Asign a sequential CPU ordinal to each active cpu */
+            spin_lock(&barr->mutex);
+            my_cpu_ord = cpu_ord++;
+            smp_set_ordinal(my_cpu_num, my_cpu_ord);
+            spin_unlock(&barr->mutex);
+            btrace(my_cpu_num, __LINE__, "AP_Done   ", 0, my_cpu_num,
+                   my_cpu_ord);
+        }
+
+    } else {
+        /* Unlock after a relocation */
+        spin_unlock(&barr->mutex);
+        /* Get the CPU ordinal since it is lost during relocation */
+        my_cpu_ord = smp_my_ord_num(my_cpu_num);
+        btrace(my_cpu_num, __LINE__, "Reloc_Done",0,my_cpu_num,my_cpu_ord);
+    }
+
+    /* A barrier to insure that all of the CPUs are done with startup */
+    barrier();
+    btrace(my_cpu_num, __LINE__, "1st Barr  ", 1, my_cpu_num, my_cpu_ord);
 	
-		/* Setup base address for testing, 1 MB */
-		win0_start = 0x100;
 
-		/* Set relocation address to 32Mb if there is enough
-		 * memory. Otherwise set it to 3Mb */
-		/* Large reloc addr allows for more testing overlap */
-	        if ((ulong)vv->pmap[vv->msegs-1].end > 0x2f00) {
-			high_test_adr = 0x2000000;
-	        } else {
-			high_test_adr = 0x300000;
-		} 
-		win1_end = (high_test_adr >> 12);
+    /* Setup Memory Management and measure memory speed, we do it here
+     * because we need all of the available CPUs */
+    if (start_seq < 2) {
 
-		/* Adjust the map to not test the page at 939k,
-		 *  reserved for locks */
-		vv->pmap[0].end--;
-
-		find_ticks_for_pass();
-       	    } else {
-		/* APs only, Register the APs */
-		btrace(my_cpu_num, __LINE__, "AP_Start  ", 0, my_cpu_num,
-			cpu_ord);
-		smp_ap_booted(my_cpu_num);
-		/* Asign a sequential CPU ordinal to each active cpu */
-		spin_lock(&barr->mutex);
-		my_cpu_ord = cpu_ord++;
-		smp_set_ordinal(my_cpu_num, my_cpu_ord);
-		spin_unlock(&barr->mutex);
-		btrace(my_cpu_num, __LINE__, "AP_Done   ", 0, my_cpu_num,
-			my_cpu_ord);
-	    }
-
-	} else {
-	    /* Unlock after a relocation */
-	    spin_unlock(&barr->mutex);
-	    /* Get the CPU ordinal since it is lost during relocation */
-	    my_cpu_ord = smp_my_ord_num(my_cpu_num);
-	    btrace(my_cpu_num, __LINE__, "Reloc_Done",0,my_cpu_num,my_cpu_ord);
-	}
-
-	/* A barrier to insure that all of the CPUs are done with startup */
-	barrier();
-	btrace(my_cpu_num, __LINE__, "1st Barr  ", 1, my_cpu_num, my_cpu_ord);
-	
-
-	/* Setup Memory Management and measure memory speed, we do it here
-	 * because we need all of the available CPUs */
-	if (start_seq < 2) {
-
-	   /* Enable floating point processing */
-	   if (cpu_id.fid.bits.fpu)
-        	__asm__ __volatile__ (
-		    "movl %%cr0, %%eax\n\t"
-		    "andl $0x7, %%eax\n\t"
-		    "movl %%eax, %%cr0\n\t"
-                    : :
-                    : "ax"
+        /* Enable floating point processing */
+        if (cpu_id.fid.bits.fpu)
+            __asm__ __volatile__
+                (
+                 "movl %%cr0, %%eax\n\t"
+                 "andl $0x7, %%eax\n\t"
+                 "movl %%eax, %%cr0\n\t"
+                 : :
+                 : "ax"
                 );
 	   if (cpu_id.fid.bits.sse)
-        	__asm__ __volatile__ (
+               __asm__ __volatile__
+                   (
                     "movl %%cr4, %%eax\n\t"
                     "orl $0x00000200, %%eax\n\t"
                     "movl %%eax, %%cr4\n\t"
                     : :
                     : "ax"
-                );
+                    );
 
-	    btrace(my_cpu_num, __LINE__, "Mem Mgmnt ", 1, cpu_id.fid.bits.pae, cpu_id.fid.bits.lm);
-	    /* Setup memory management modes */
-	    /* If we have PAE, turn it on */
-	    if (cpu_id.fid.bits.pae == 1) {
-		__asm__ __volatile__(
+           btrace(my_cpu_num, __LINE__, "Mem Mgmnt ", 1, cpu_id.fid.bits.pae, cpu_id.fid.bits.lm);
+           /* Setup memory management modes */
+           /* If we have PAE, turn it on */
+           if (cpu_id.fid.bits.pae == 1) {
+               __asm__ __volatile__
+                   (
                     "movl %%cr4, %%eax\n\t"
                     "orl $0x00000020, %%eax\n\t"
                     "movl %%eax, %%cr4\n\t"
                     : :
                     : "ax"
-                );
-        cprint(LINE_TITLE+1, COL_MODE, "(PAE Mode)");
-       	    }
-	    /* If this is a 64 CPU enable long mode */
-	    if (cpu_id.fid.bits.lm == 1) {
-		__asm__ __volatile__(
-		    "movl $0xc0000080, %%ecx\n\t"
+                    );
+               cprint(LINE_TITLE+1, COL_MODE, "(PAE Mode)");
+           }
+           /* If this is a 64 CPU enable long mode */
+           if (cpu_id.fid.bits.lm == 1) {
+               __asm__ __volatile__
+                   (
+                    "movl $0xc0000080, %%ecx\n\t"
 		    "rdmsr\n\t"
 		    "orl $0x00000100, %%eax\n\t"
 		    "wrmsr\n\t"
 		    : :
 		    : "ax", "cx"
-		);
-		cprint(LINE_TITLE+1, COL_MODE, "(X64 Mode)");
+                    );
+               cprint(LINE_TITLE+1, COL_MODE, "(X64 Mode)");
+           }
+           /* Get the memory Speed with all CPUs */
+           get_mem_speed(my_cpu_num, num_cpus);
+    }
+
+    /* Set the initialized flag only after all of the CPU's have
+     * Reached the barrier. This insures that relocation has
+     * been completed for each CPU. */
+    btrace(my_cpu_num, __LINE__, "Start Done", 1, 0, 0);
+    start_seq = 2;
+
+    /* Loop through all tests */
+    while (1) {
+        /* If the restart flag is set all initial params */
+        if (restart_flag) {
+            set_defaults();
+            continue;
+        }
+        /* Skip single CPU tests if we are using only one CPU */
+        if (tseq[test].cpu_sel == -1 && 
+            (num_cpus == 1 || cpu_mode != CPM_ALL)) {
+            test++;
+            continue;
+        }
+
+        test_setup();
+
+        /* Loop through all possible windows */
+        while (win_next <= ((ulong)vv->pmap[vv->msegs-1].end + WIN_SZ_PAGES)) {
+
+            /* Main scheduling barrier */
+            cprint(8, my_cpu_num+7, "W");
+            btrace(my_cpu_num, __LINE__, "Sched_Barr", 1,window,win_next);
+            barrier();
+
+            /* Don't go over the 8TB PAE limit */
+            if (win_next > MAX_MEM_PAGES) {
+                break;
             }
-	    /* Get the memory Speed with all CPUs */
-	    get_mem_speed(my_cpu_num, num_cpus);
-	}
 
-	/* Set the initialized flag only after all of the CPU's have
-	 * Reached the barrier. This insures that relocation has
-	 * been completed for each CPU. */
-	btrace(my_cpu_num, __LINE__, "Start Done", 1, 0, 0);
-	start_seq = 2;
+            /* For the bit fade test, #11, we cannot relocate so bump the
+             * window to 1 */
+            if (tseq[test].pat == 11 && window == 0) {
+                window = 1;
+            }
 
-	/* Loop through all tests */
-	while (1) {
-	    /* If the restart flag is set all initial params */
-	    if (restart_flag) {
-		set_defaults();
-		continue;
-	    }
-            /* Skip single CPU tests if we are using only one CPU */
-            if (tseq[test].cpu_sel == -1 && 
-                    (num_cpus == 1 || cpu_mode != CPM_ALL)) {
-                test++; 
+            /* Relocate if required */
+            if (window != 0 && (ulong)&_start != LOW_TEST_ADR) {
+                btrace(my_cpu_num, __LINE__, "Sched_RelL", 1,0,0);
+                run_at(LOW_TEST_ADR, my_cpu_num);
+            }
+            if (window == 0 && vv->plim_lower >= win0_start) {
+                window++;
+            }
+            if (window == 0 && (ulong)&_start == LOW_TEST_ADR) {
+                btrace(my_cpu_num, __LINE__, "Sched_RelH", 1,0,0);
+                run_at(high_test_adr, my_cpu_num);
+            }
+
+            /* Decide which CPU(s) to use */
+            btrace(my_cpu_num, __LINE__, "Sched_CPU0",1,cpu_sel,
+                   tseq[test].cpu_sel);
+            run = 1;
+            switch(cpu_mode) {
+            case CPM_RROBIN:
+            case CPM_SEQ:
+                /* Select a single CPU */
+                if (my_cpu_ord == cpu_sel) {
+                    mstr_cpu = cpu_sel;
+                    run_cpus = 1;
+                } else {
+                    run = 0;
+                }
+                break;
+            case CPM_ALL:
+                /* Use all CPUs */
+                if (tseq[test].cpu_sel == -1) {
+                    /* Round robin through all of the CPUs */
+                    if (my_cpu_ord == cpu_sel) {
+                        mstr_cpu = cpu_sel;
+                        run_cpus = 1;
+                    } else {
+                        run = 0;
+                    }
+                } else {
+                    /* Use the number of CPUs specified by the test,
+                     * Starting with zero */
+                    if (my_cpu_ord >= tseq[test].cpu_sel) {
+                        run = 0;
+                    }
+                    /* Set the master CPU to the highest CPU number 
+                     * that has been selected */
+                    if (act_cpus < tseq[test].cpu_sel) {
+                        mstr_cpu = act_cpus-1;
+                        run_cpus = act_cpus;
+                    } else {
+                        mstr_cpu = tseq[test].cpu_sel-1;
+                        run_cpus = tseq[test].cpu_sel;
+                    }
+                }
+            }
+            btrace(my_cpu_num, __LINE__, "Sched_CPU1",1,run_cpus,run);
+            barrier();
+            dprint(9, 7, run_cpus, 2, 0);
+
+            /* Setup a sub barrier for only the selected CPUs */
+            if (my_cpu_ord == mstr_cpu) {
+                s_barrier_init(run_cpus);
+            }
+
+            /* Make sure the the sub barrier is ready before proceeding */
+            barrier();
+
+            /* Not selected CPUs go back to the scheduling barrier */
+            if (run == 0 ) {
+                continue;
+            }
+            cprint(8, my_cpu_num+7, "-");
+            btrace(my_cpu_num, __LINE__, "Sched_Win0",1,window,win_next);
+
+            /* Do we need to exit */
+            if(reloc_pending) {
+                reloc_internal(my_cpu_num);
+            }
+
+            if (my_cpu_ord == mstr_cpu) {
+                switch (window) {
+		    /* Special case for relocation */
+                case 0:
+                    winx.start = 0;
+                    winx.end = win1_end;
+                    window++;
+                    break;
+		    /* Special case for first segment */
+                case 1:
+                    winx.start = win0_start;
+                    winx.end = WIN_SZ_PAGES;
+                    win_next += WIN_SZ_PAGES;
+                    window++;
+                    break;
+		    /* For all other windows */
+                default:
+                    winx.start = win_next;
+                    win_next += WIN_SZ_PAGES;
+                    winx.end = win_next;
+                }
+                btrace(my_cpu_num,__LINE__,"Sched_Win1",1,winx.start,
+                       winx.end);
+
+                /* Find the memory areas to test */
+                segs = compute_segments(winx, my_cpu_num);
+            }
+            s_barrier();
+            btrace(my_cpu_num,__LINE__,"Sched_Win2",1,segs,
+                   vv->map[0].pbase_addr);
+
+            if (segs == 0) {
+		/* No memory in this window so skip it */
                 continue;
             }
 
-	    test_setup();
+            /* map in the window... */
+            if (map_page(vv->map[0].pbase_addr) < 0) {
+                /* Either there is no PAE or we are at the PAE limit */
+                break;
+            }
 
-	    /* Loop through all possible windows */
-	    while (win_next <= ((ulong)vv->pmap[vv->msegs-1].end + WIN_SZ)) {
+            btrace(my_cpu_num, __LINE__, "Strt_Test ",1,my_cpu_num,
+                   my_cpu_ord);
+            do_test(my_cpu_ord);
+            btrace(my_cpu_num, __LINE__, "End_Test  ",1,my_cpu_num,
+                   my_cpu_ord);
 
-		/* Main scheduling barrier */
-		cprint(8, my_cpu_num+7, "W");
-		btrace(my_cpu_num, __LINE__, "Sched_Barr", 1,window,win_next);
-		barrier();
+            paging_off();
 
-		/* Don't go over the 8TB PAE limit */
-		if (win_next > MAX_MEM) {
-			break;
-		}
+        } /* End of window loop */
 
-		/* For the bit fade test, #11, we cannot relocate so bump the
-		 * window to 1 */
-		if (tseq[test].pat == 11 && window == 0) {
-			window = 1;
-		}
+        s_barrier();
+        btrace(my_cpu_num, __LINE__, "End_Win   ",1,test, window);
 
-		/* Relocate if required */
-		if (window != 0 && (ulong)&_start != LOW_TEST_ADR) {
-			btrace(my_cpu_num, __LINE__, "Sched_RelL", 1,0,0);
-			run_at(LOW_TEST_ADR, my_cpu_num);
-	        }
-		if (window == 0 && vv->plim_lower >= win0_start) {
-			window++;
-		}
-		if (window == 0 && (ulong)&_start == LOW_TEST_ADR) {
-			btrace(my_cpu_num, __LINE__, "Sched_RelH", 1,0,0);
-			run_at(high_test_adr, my_cpu_num);
-		}
+        /* Setup for the next set of windows */
+        win_next = 0;
+        window = 0;
+        bail = 0;
 
-		/* Decide which CPU(s) to use */
-		btrace(my_cpu_num, __LINE__, "Sched_CPU0",1,cpu_sel,
-			tseq[test].cpu_sel);
-		run = 1;
-		switch(cpu_mode) {
-		case CPM_RROBIN:
-		case CPM_SEQ:
-			/* Select a single CPU */
-			if (my_cpu_ord == cpu_sel) {
-				mstr_cpu = cpu_sel;
-				run_cpus = 1;
-	    		} else {
-				run = 0;
-			}
-			break;
-		case CPM_ALL:
-		    /* Use all CPUs */
-		    if (tseq[test].cpu_sel == -1) {
-			/* Round robin through all of the CPUs */
-			if (my_cpu_ord == cpu_sel) {
-				mstr_cpu = cpu_sel;
-				run_cpus = 1;
-	    		} else {
-				run = 0;
-			}
-		    } else {
-			/* Use the number of CPUs specified by the test,
-			 * Starting with zero */
-			if (my_cpu_ord >= tseq[test].cpu_sel) {
-				run = 0;
-			}
-			/* Set the master CPU to the highest CPU number 
-			 * that has been selected */
-			if (act_cpus < tseq[test].cpu_sel) {
-				mstr_cpu = act_cpus-1;
-				run_cpus = act_cpus;
-			} else {
-				mstr_cpu = tseq[test].cpu_sel-1;
-				run_cpus = tseq[test].cpu_sel;
-			}
-		    }
-		}
-		btrace(my_cpu_num, __LINE__, "Sched_CPU1",1,run_cpus,run);
-		barrier();
-		dprint(9, 7, run_cpus, 2, 0);
+        /* Only the master CPU does the end of test housekeeping */
+        if (my_cpu_ord != mstr_cpu) {
+            continue;
+        }
 
-		/* Setup a sub barrier for only the selected CPUs */
-		if (my_cpu_ord == mstr_cpu) {
-			s_barrier_init(run_cpus);
-		}
+        /* Special handling for the bit fade test #11 */
+        if (tseq[test].pat == 11 && bitf_seq != 6) {
+            /* Keep going until the sequence is complete. */
+            bitf_seq++;
+            continue;
+        } else {
+            bitf_seq = 0;
+        }
 
-		/* Make sure the the sub barrier is ready before proceeding */
-		barrier();
-
-		/* Not selected CPUs go back to the scheduling barrier */
-		if (run == 0 ) {
-			continue;
-		}
-		cprint(8, my_cpu_num+7, "-");
-		btrace(my_cpu_num, __LINE__, "Sched_Win0",1,window,win_next);
-
-		/* Do we need to exit */
-		if(reloc_pending) {
-		    reloc_internal(my_cpu_num);
-	 	}
-
-		if (my_cpu_ord == mstr_cpu) {
-		    switch (window) {
-		    /* Special case for relocation */
-		    case 0:
-			winx.start = 0;
-			winx.end = win1_end;
-			window++;
-			break;
-		    /* Special case for first segment */
-		    case 1:
-			winx.start = win0_start;
-			winx.end = WIN_SZ;
-			win_next += WIN_SZ;
-			window++;
-			break;
-		    /* For all other windows */
-		    default:
-			winx.start = win_next;
-			win_next += WIN_SZ;
-			winx.end = win_next;
-		    }
-		    btrace(my_cpu_num,__LINE__,"Sched_Win1",1,winx.start,
-				winx.end);
-
-	            /* Find the memory areas to test */
-	            segs = compute_segments(winx, my_cpu_num);
-		}
-		s_barrier();
-		btrace(my_cpu_num,__LINE__,"Sched_Win2",1,segs,
-			vv->map[0].pbase_addr);
-
-	        if (segs == 0) {
-		/* No memory in this window so skip it */
-		    continue;
-	        }
-
-		/* map in the window... */
-		if (map_page(vv->map[0].pbase_addr) < 0) {
-		    /* Either there is no PAE or we are at the PAE limit */
-		    break;
-		}
-
-		btrace(my_cpu_num, __LINE__, "Strt_Test ",1,my_cpu_num,
-			my_cpu_ord);
-		do_test(my_cpu_ord);
-		btrace(my_cpu_num, __LINE__, "End_Test  ",1,my_cpu_num,
-			my_cpu_ord);
-
-            	paging_off();
-
-	    } /* End of window loop */
-
-	    s_barrier();
-	    btrace(my_cpu_num, __LINE__, "End_Win   ",1,test, window);
-
-	    /* Setup for the next set of windows */
-	    win_next = 0;
-	    window = 0;
-	    bail = 0;
-
-	    /* Only the master CPU does the end of test housekeeping */
-	    if (my_cpu_ord != mstr_cpu) {
-		continue;
-	    }
-
-	    /* Special handling for the bit fade test #11 */
-	    if (tseq[test].pat == 11 && bitf_seq != 6) {
-		/* Keep going until the sequence is complete. */
-		bitf_seq++;
-		continue;
-	    } else {
-		bitf_seq = 0;
-	    }
-
-	    /* Select advancement of CPUs and next test */
-	    switch(cpu_mode) {
-	    case CPM_RROBIN:
-		if (++cpu_sel >= act_cpus) {
-		    cpu_sel = 0;
-		}
-		next_test();
-		break;
-	    case CPM_SEQ:
-		if (++cpu_sel >= act_cpus) {
-		    cpu_sel = 0;
-		    next_test();
-		}
-		break;
-	    case CPM_ALL:
-	      if (tseq[test].cpu_sel == -1) 
-	      	{
-			    /* Do the same test for each CPU */
-			    if (++cpu_sel >= act_cpus) 
-			    	{
+        /* Select advancement of CPUs and next test */
+        switch(cpu_mode) {
+        case CPM_RROBIN:
+            if (++cpu_sel >= act_cpus) {
+                cpu_sel = 0;
+            }
+            next_test();
+            break;
+        case CPM_SEQ:
+            if (++cpu_sel >= act_cpus) {
+                cpu_sel = 0;
+                next_test();
+            }
+            break;
+        case CPM_ALL:
+            if (tseq[test].cpu_sel == -1) 
+            {
+                /* Do the same test for each CPU */
+                if (++cpu_sel >= act_cpus) 
+                {
 	            cpu_sel = 0;
-			        next_test();
-			    	} else {
-			        continue;
-			    	}
-	        } else {
-		    		next_test();
-					}
-	    } //????
-	    btrace(my_cpu_num, __LINE__, "Next_CPU  ",1,cpu_sel,test);
+                    next_test();
+                } else {
+                    continue;
+                }
+            } else {
+                next_test();
+            }
+        } //????
+        btrace(my_cpu_num, __LINE__, "Next_CPU  ",1,cpu_sel,test);
 
-	    /* If this was the last test then we finished a pass */
-	  if (pass_flag) 
-	  	{
-			pass_flag = 0;
+        /* If this was the last test then we finished a pass */
+        if (pass_flag) 
+        {
+            pass_flag = 0;
 			
-			vv->pass++;
+            vv->pass++;
 			
-			dprint(LINE_INFO, 49, vv->pass, 5, 0);
-			find_ticks_for_pass();
-			ltest = -1;
+            dprint(LINE_INFO, 49, vv->pass, 5, 0);
+            find_ticks_for_pass();
+            ltest = -1;
 			
-			if (vv->ecount == 0) 
-				{
-			    /* If onepass is enabled and we did not get any errors
-			     * reboot to exit the test */
-			    if (onepass) {	reboot();   }
-			    if (!btflag) cprint(LINE_MSG, COL_MSG-8, "** Pass complete, no errors, press Esc to exit **");
-					if(BEEP_END_NO_ERROR) 
-						{
-							beep(1000);
-							beep(2000);
-							beep(1000);
-							beep(2000);
-						}
-				}
-	    }
+            if (vv->ecount == 0) 
+            {
+                /* If onepass is enabled and we did not get any errors
+                 * reboot to exit the test */
+                if (onepass) {	reboot();   }
+                if (!btflag) cprint(LINE_MSG, COL_MSG-8, "** Pass complete, no errors, press Esc to exit **");
+                if(BEEP_END_NO_ERROR) 
+                {
+                    beep(1000);
+                    beep(2000);
+                    beep(1000);
+                    beep(2000);
+                }
+            }
+        }
 
-	    bail=0;
-	} /* End test loop */
+        bail=0;
+    } /* End test loop */
 }
-
 
 void test_setup()
 {
@@ -1044,10 +1047,10 @@ int find_chunks(int tst)
 {
 	int i, j, sg, wmax, ch;
 	struct pmap twin={0,0};
-	unsigned long wnxt = WIN_SZ;
+	unsigned long wnxt = WIN_SZ_PAGES;
 	unsigned long len;
 
-	wmax = MAX_MEM/WIN_SZ+2;  /* The number of 2 GB segments +2 */
+	wmax = MAX_MEM_PAGES/WIN_SZ_PAGES+2;  /* The number of 2 GB segments +2 */
 	/* Compute the number of SPINSZ memory segments */
 	ch = 0;
 	for(j = 0; j < wmax; j++) {
@@ -1060,13 +1063,13 @@ int find_chunks(int tst)
 		/* special case for first 2 GB */
 		if (j == 1) {
 			twin.start = win0_start;
-			twin.end = WIN_SZ;
+			twin.end = WIN_SZ_PAGES;
 		}
 
 		/* For all other windows */
 		if (j > 1) {
 			twin.start = wnxt;
-			wnxt += WIN_SZ;
+			wnxt += WIN_SZ_PAGES;
 			twin.end = wnxt;
 		}
 

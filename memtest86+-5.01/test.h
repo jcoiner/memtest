@@ -22,24 +22,24 @@
 #define E820_NVS        4
 
 struct e820entry {
-        unsigned long long addr;        /* start of memory segment */
-        unsigned long long size;        /* size of memory segment */
-        unsigned long type;             /* type of memory segment */
+    unsigned long long addr;        /* start of memory segment */
+    unsigned long long size;        /* size of memory segment */
+    unsigned long type;             /* type of memory segment */
 };
 
 struct mem_info_t {
-	unsigned long e88_mem_k;	/* 0x00 */
-	unsigned long e801_mem_k;	/* 0x04 */
-	unsigned long e820_nr;		/* 0x08 */
-	struct e820entry e820[E820MAX];	/* 0x0c */
-					/* 0x28c */
+    unsigned long e88_mem_k;         /* 0x00 */
+    unsigned long e801_mem_k;        /* 0x04 */
+    unsigned long e820_nr;           /* 0x08 */
+    struct e820entry e820[E820MAX];  /* 0x0c */
+                                    /* 0x28c */
 };
 
 typedef unsigned long ulong;
-#define STACKSIZE       (8*1024)
-#define MAX_MEM         0x7FF00000      /* 8 TB */
-#define WIN_SZ          0x80000         /* 2 GB */
-#define UNMAP_SZ        (0x100000-WIN_SZ)  /* Size of umappped first segment */
+#define STACKSIZE_BYTES (8*1024)
+#define MAX_MEM_PAGES   0x7FF00000      /* 8 TB; units are 4K pages */
+#define WIN_SZ_PAGES    0x80000         /* 2 GB; units are 4K pages */
+#define UNMAP_SZ_PAGES  (0x100000-WIN_SZ_PAGES)  /* Size of umapped first segment */
 
 #define SPINSZ		0x4000000	/* 256 MB */
 #define MOD_SZ		20
