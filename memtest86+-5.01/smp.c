@@ -54,7 +54,7 @@ void s_barrier_init(int max)
 
 void barrier()
 {
-	if (num_cpus == 1 || v->fail_safe & 3) {
+	if (num_cpus == 1 || vv->fail_safe & 3) {
 		return;
 	}
 	spin_wait(&barr->st1);     /* Wait if the barrier is active */
@@ -78,7 +78,7 @@ void barrier()
 
 void s_barrier()
 {
-	if (run_cpus == 1 || v->fail_safe & 3) {
+	if (run_cpus == 1 || vv->fail_safe & 3) {
 		return;
 	}
 	spin_wait(&barr->s_st1);     /* Wait if the barrier is active */
@@ -508,11 +508,11 @@ void smp_find_cpus()
    unsigned int *ptr;
    unsigned int uiptr;
 
-   if(v->fail_safe & 3) { return; }
+   if(vv->fail_safe & 3) { return; }
 
    memset(&AP, 0, sizeof AP);
 
-	if(v->fail_safe & 8)
+	if(vv->fail_safe & 8)
 	{		
 	   // Search for the Floating MP structure pointer
 	   fp = scan_for_floating_ptr_struct(0x0, 0x400);

@@ -14,7 +14,6 @@
 #include "stdint.h"
 #include "cpuid.h"
 #include "smp.h"
-//#include <sys/io.h>
 
 extern struct cpu_ident cpu_id;
 extern volatile int    mstr_cpu;
@@ -40,36 +39,37 @@ static inline ulong roundup(ulong value, ulong mask)
 // align - number of bytes to align each block to
 void calculate_chunk(ulong** start, ulong** end, int me, int j, int makeMultipleOf)
 {
-	ulong chunk;
+    ulong chunk;
 
+    // If we are only running 1 CPU then test the whole block
+    if (run_cpus == 1) {
+        *start = vv->map[j].start;
+        *end = vv->map[j].end;
+    } 
+    else{
 
-	// If we are only running 1 CPU then test the whole block
-	if (run_cpus == 1) {
-		*start = v->map[j].start;
-		*end = v->map[j].end;
-	} 
-	else{
-
-		// Divide the current segment by the number of CPUs
-		chunk = (ulong)v->map[j].end-(ulong)v->map[j].start;
-		chunk /= run_cpus;
+        // Divide the current segment by the number of CPUs
+        chunk = (ulong)vv->map[j].end-(ulong)vv->map[j].start;
+        chunk /= run_cpus;
 		
-		// Round down to the nearest desired bitlength multiple
-		chunk = (chunk + (makeMultipleOf-1)) &  ~(makeMultipleOf-1);
+        // Round down to the nearest desired bitlength multiple
+        chunk = (chunk + (makeMultipleOf-1)) &  ~(makeMultipleOf-1);
 
-		// Figure out chunk boundaries
-		*start = (ulong*)((ulong)v->map[j].start+(chunk*me));
-		/* Set end addrs for the highest CPU num to the
-			* end of the segment for rounding errors */
-		// Also rounds down to boundary if needed, may miss some ram but better than crashing or producing false errors.
-		// This rounding probably will never happen as the segments should be in 4096 bytes pages if I understand correctly.
-		if (me == mstr_cpu) {
-			*end = (ulong*)(v->map[j].end);
-		} else {
-			*end = (ulong*)((ulong)(*start) + chunk);
-			(*end)--;
-		}
-	}
+        // Figure out chunk boundaries
+        *start = (ulong*)((ulong)vv->map[j].start+(chunk*me));
+        /* Set end addrs for the highest CPU num to the
+         * end of the segment for rounding errors */
+        /* Also rounds down to boundary if needed, may miss some ram but
+           better than crashing or producing false errors. */
+        /* This rounding probably will never happen as the segments should
+           be in 4096 bytes pages if I understand correctly. */
+        if (me == mstr_cpu) {
+            *end = (ulong*)(vv->map[j].end);
+        } else {
+            *end = (ulong*)((ulong)(*start) + chunk);
+            (*end)--;
+        }
+    }
 }
 
 /*
@@ -86,12 +86,12 @@ void addr_tst1(int me)
         	hprint(LINE_PAT, COL_PAT, p1);
 
 		/* Set pattern in our lowest multiple of 0x20000 */
-		p = (ulong *)roundup((ulong)v->map[0].start, 0x1ffff);
+		p = (ulong *)roundup((ulong)vv->map[0].start, 0x1ffff);
 		*p = p1;
 	
 		/* Now write pattern compliment */
 		p1 = ~p1;
-		end = v->map[segs-1].end;
+		end = vv->map[segs-1].end;
 		for (i=0; i<100; i++) {
 			mask = 4;
 			do {
@@ -119,7 +119,7 @@ void addr_tst1(int me)
 	/* Now check the address bits in each bank */
 	/* If we have more than 8mb of memory then the bank size must be */
 	/* bigger than 256k.  If so use 1mb for the bank size. */
-	if (v->pmap[v->msegs - 1].end > (0x800000 >> 12)) {
+	if (vv->pmap[vv->msegs - 1].end > (0x800000 >> 12)) {
 		bank = 0x100000;
 	} else {
 		bank = 0x40000;
@@ -128,12 +128,12 @@ void addr_tst1(int me)
         	hprint(LINE_PAT, COL_PAT, p1);
 
 		for (j=0; j<segs; j++) {
-			p = v->map[j].start;
+			p = vv->map[j].start;
 			/* Force start address to be a multiple of 256k */
 			p = (ulong *)roundup((ulong)p, bank - 1);
-			end = v->map[j].end;
+			end = vv->map[j].end;
 			/* Redundant checks for overflow */
-                        while (p < end && p > v->map[j].start && p != 0) {
+                        while (p < end && p > vv->map[j].start && p != 0) {
 				*p = p1;
 
 				p1 = ~p1;
@@ -185,8 +185,8 @@ void addr_tst2(int me)
 
 	/* Write each address with it's own address */
 	for (j=0; j<segs; j++) {
-		start = v->map[j].start;
-		end = v->map[j].end;
+		start = vv->map[j].start;
+		end = vv->map[j].end;
 		pe = (ulong *)start;
 		p = start;
 		done = 0;
@@ -230,8 +230,8 @@ void addr_tst2(int me)
 
 	/* Each address should have its own address */
 	for (j=0; j<segs; j++) {
-		start = v->map[j].start;
-		end = v->map[j].end;
+		start = vv->map[j].start;
+		end = vv->map[j].end;
 		pe = (ulong *)start;
 		p = start;
 		done = 0;
@@ -311,8 +311,8 @@ void movinvr(int me)
 	if (cpu_id.fid.bits.rdtsc) {
 		asm __volatile__ ("rdtsc":"=a" (seed1),"=d" (seed2));
 	} else {
-		seed1 = 521288629 + v->pass;
-		seed2 = 362436069 - v->pass;
+		seed1 = 521288629 + vv->pass;
+		seed2 = 362436069 - vv->pass;
 	}
 
 	/* Display the current seed */
@@ -1424,8 +1424,8 @@ void bit_fade_fill(ulong p1, int me)
 
 	/* Initialize memory with the initial pattern.  */
 	for (j=0; j<segs; j++) {
-		start = v->map[j].start;
-		end = v->map[j].end;
+		start = vv->map[j].start;
+		end = vv->map[j].end;
 		pe = (ulong *)start;
 		p = start;
 		done = 0;
@@ -1463,8 +1463,8 @@ void bit_fade_chk(ulong p1, int me)
 
 	/* Make sure that nothing changed while sleeping */
 	for (j=0; j<segs; j++) {
-		start = v->map[j].start;
-		end = v->map[j].end;
+		start = vv->map[j].start;
+		end = vv->map[j].end;
 		pe = (ulong *)start;
 		p = start;
 		done = 0;
@@ -1521,11 +1521,11 @@ void sleep(long n, int flag, int me, int sms)
 			"0" (l), "1" (h));
 
 		if (sms != 0) {
-			t = h * ((unsigned)0xffffffff / v->clks_msec);
-			t += (l / v->clks_msec);
+			t = h * ((unsigned)0xffffffff / vv->clks_msec);
+			t += (l / vv->clks_msec);
 		} else {
-			t = h * ((unsigned)0xffffffff / v->clks_msec) / 1000;
-			t += (l / v->clks_msec) / 1000;
+			t = h * ((unsigned)0xffffffff / vv->clks_msec) / 1000;
+			t += (l / vv->clks_msec) / 1000;
 		}
 		
 		/* Is the time up? */

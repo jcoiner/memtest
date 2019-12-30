@@ -95,8 +95,8 @@ void coretemp(void)
 			tjunc = ((msrl >> 16) & 0x7F);
 			if(tjunc < 50 || tjunc > 125) { tjunc = 90; } // assume Tjunc = 90°C if boggus value received.
 			tnow = tjunc - tabs;		
-			dprint(LINE_CPU+1, 30, v->check_temp, 3, 0);	
-			v->check_temp = tnow;
+			dprint(LINE_CPU+1, 30, vv->check_temp, 3, 0);	
+			vv->check_temp = tnow;
 		}
 		return;
 	}
@@ -106,8 +106,8 @@ void coretemp(void)
 	{
 		pci_conf_read(0, 24, 3, 0xA4, 4, &rtcr);
 		amd_raw_temp = ((rtcr >> 21) & 0x7FF);
-		v->check_temp = (int)(amd_raw_temp / 8);
-		dprint(LINE_CPU+1, 30, v->check_temp, 3, 0);	
+		vv->check_temp = (int)(amd_raw_temp / 8);
+		dprint(LINE_CPU+1, 30, vv->check_temp, 3, 0);	
 	}	
 	
 				
@@ -4102,7 +4102,7 @@ void find_controller(void)
 	
 	// Detect IMC by CPUID
 	if(imc_type) { vendor = 0xFFFF; device = imc_type; }
-	if(v->fail_safe & 1) { vendor = 0xFFFF; device = 0xFFFF; }
+	if(vv->fail_safe & 1) { vendor = 0xFFFF; device = 0xFFFF; }
 		
 	//hprint(11,0,vendor); hprint(11,10,device);
 		

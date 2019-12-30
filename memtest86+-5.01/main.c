@@ -79,7 +79,7 @@ uint8_t volatile stacks[MAX_CPUS][STACKSIZE];
 int 		bitf_seq = 0;
 char		cmdline_parsed = 0;
 struct 		vars variables = {};
-struct 		vars * const v = &variables;
+struct 		vars * const vv = &variables;
 volatile int 	bail;
 int 		nticks;
 int 		test_ticks;
@@ -138,29 +138,29 @@ void set_defaults()
 	bail = 0;
 	cpu_mode = CPM_ALL;
 	cpu_sel = 0;
-	v->printmode=PRINTMODE_ADDRESSES;
-	v->numpatn=0;
-	v->plim_lower = 0;
-	v->plim_upper = v->pmap[v->msegs-1].end;
-	v->pass = 0;
-	v->msg_line = 0;
-	v->ecount = 0;
-	v->ecc_ecount = 0;
-	v->msg_line = LINE_SCROLL-1;
-	v->scroll_start = v->msg_line * 160;
-	v->erri.low_addr.page = 0x7fffffff;
-	v->erri.low_addr.offset = 0xfff;
-	v->erri.high_addr.page = 0;
-	v->erri.high_addr.offset = 0;
-	v->erri.min_bits = 32;
-	v->erri.max_bits = 0;
-	v->erri.min_bits = 32;
-	v->erri.max_bits = 0;
-	v->erri.maxl = 0;
-	v->erri.cor_err = 0;
-	v->erri.ebits = 0;
-	v->erri.hdr_flag = 0;
-	v->erri.tbits = 0;
+	vv->printmode=PRINTMODE_ADDRESSES;
+	vv->numpatn=0;
+	vv->plim_lower = 0;
+	vv->plim_upper = vv->pmap[vv->msegs-1].end;
+	vv->pass = 0;
+	vv->msg_line = 0;
+	vv->ecount = 0;
+	vv->ecc_ecount = 0;
+	vv->msg_line = LINE_SCROLL-1;
+	vv->scroll_start = vv->msg_line * 160;
+	vv->erri.low_addr.page = 0x7fffffff;
+	vv->erri.low_addr.offset = 0xfff;
+	vv->erri.high_addr.page = 0;
+	vv->erri.high_addr.offset = 0;
+	vv->erri.min_bits = 32;
+	vv->erri.max_bits = 0;
+	vv->erri.min_bits = 32;
+	vv->erri.max_bits = 0;
+	vv->erri.maxl = 0;
+	vv->erri.cor_err = 0;
+	vv->erri.ebits = 0;
+	vv->erri.hdr_flag = 0;
+	vv->erri.tbits = 0;
 	for (i=0; tseq[i].msg != NULL; i++) {
 		tseq[i].errors = 0;
 	}
@@ -433,7 +433,7 @@ void test_start(void)
 		/* Set relocation address to 32Mb if there is enough
 		 * memory. Otherwise set it to 3Mb */
 		/* Large reloc addr allows for more testing overlap */
-	        if ((ulong)v->pmap[v->msegs-1].end > 0x2f00) {
+	        if ((ulong)vv->pmap[vv->msegs-1].end > 0x2f00) {
 			high_test_adr = 0x2000000;
 	        } else {
 			high_test_adr = 0x300000;
@@ -442,7 +442,7 @@ void test_start(void)
 
 		/* Adjust the map to not test the page at 939k,
 		 *  reserved for locks */
-		v->pmap[0].end--;
+		vv->pmap[0].end--;
 
 		find_ticks_for_pass();
        	    } else {
@@ -546,7 +546,7 @@ void test_start(void)
 	    test_setup();
 
 	    /* Loop through all possible windows */
-	    while (win_next <= ((ulong)v->pmap[v->msegs-1].end + WIN_SZ)) {
+	    while (win_next <= ((ulong)vv->pmap[vv->msegs-1].end + WIN_SZ)) {
 
 		/* Main scheduling barrier */
 		cprint(8, my_cpu_num+7, "W");
@@ -569,7 +569,7 @@ void test_start(void)
 			btrace(my_cpu_num, __LINE__, "Sched_RelL", 1,0,0);
 			run_at(LOW_TEST_ADR, my_cpu_num);
 	        }
-		if (window == 0 && v->plim_lower >= win0_start) {
+		if (window == 0 && vv->plim_lower >= win0_start) {
 			window++;
 		}
 		if (window == 0 && (ulong)&_start == LOW_TEST_ADR) {
@@ -672,7 +672,7 @@ void test_start(void)
 		}
 		s_barrier();
 		btrace(my_cpu_num,__LINE__,"Sched_Win2",1,segs,
-			v->map[0].pbase_addr);
+			vv->map[0].pbase_addr);
 
 	        if (segs == 0) {
 		/* No memory in this window so skip it */
@@ -680,7 +680,7 @@ void test_start(void)
 	        }
 
 		/* map in the window... */
-		if (map_page(v->map[0].pbase_addr) < 0) {
+		if (map_page(vv->map[0].pbase_addr) < 0) {
 		    /* Either there is no PAE or we are at the PAE limit */
 		    break;
 		}
@@ -753,13 +753,13 @@ void test_start(void)
 	  	{
 			pass_flag = 0;
 			
-			v->pass++;
+			vv->pass++;
 			
-			dprint(LINE_INFO, 49, v->pass, 5, 0);
+			dprint(LINE_INFO, 49, vv->pass, 5, 0);
 			find_ticks_for_pass();
 			ltest = -1;
 			
-			if (v->ecount == 0) 
+			if (vv->ecount == 0) 
 				{
 			    /* If onepass is enabled and we did not get any errors
 			     * reboot to exit the test */
@@ -785,8 +785,8 @@ void test_setup()
 	static int ltest = -1;
 
 	/* See if a specific test has been selected */
-	if (v->testsel >= 0) {
-                test = v->testsel;
+	if (vv->testsel >= 0) {
+                test = vv->testsel;
         }
 
 	/* Only do the setup if this is a new test */
@@ -796,7 +796,7 @@ void test_setup()
 	ltest = test;
 
 	/* Now setup the test parameters based on the current test number */
-	if (v->pass == 0) {
+	if (vv->pass == 0) {
 		/* Reduce iterations for first pass */
 		c_iter = tseq[test].iter/FIRST_DIVISER;
 	} else {
@@ -808,7 +808,7 @@ void test_setup()
 	//dprint(LINE_INFO, 28, c_iter, 3, 0);
 	test_ticks = find_ticks_for_test(test);
 	nticks = 0;
-	v->tptr = 0;
+	vv->tptr = 0;
 
 	cprint(LINE_PAT, COL_PAT, "            ");
 	cprint(LINE_PAT, COL_PAT-3, "   ");
@@ -829,12 +829,12 @@ int do_test(int my_ord)
 	if (my_ord == mstr_cpu) {
 	  if ((ulong)&_start > LOW_TEST_ADR) {
 		/* Relocated so we need to test all selected lower memory */
-		v->map[0].start = mapping(v->plim_lower);
+		vv->map[0].start = mapping(vv->plim_lower);
 		
 		/* Good 'ol Legacy USB_WAR */
-		if (v->map[0].start < (ulong*)0x500) 
+		if (vv->map[0].start < (ulong*)0x500) 
 		{
-    	v->map[0].start = (ulong*)0x500;
+    	vv->map[0].start = (ulong*)0x500;
 		}
 		
 		cprint(LINE_PAT, COL_MID+25, " R");
@@ -843,14 +843,14 @@ int do_test(int my_ord)
 	    }
 
 	    /* Update display of memory segments being tested */
-	    p0 = page_of(v->map[0].start);
-	    p1 = page_of(v->map[segs-1].end);
+	    p0 = page_of(vv->map[0].start);
+	    p1 = page_of(vv->map[segs-1].end);
 	    aprint(LINE_RANGE, COL_MID+9, p0);
 	    cprint(LINE_RANGE, COL_MID+14, " - ");
 	    aprint(LINE_RANGE, COL_MID+17, p1);
 	    aprint(LINE_RANGE, COL_MID+25, p1-p0);
 	    cprint(LINE_RANGE, COL_MID+30, " of ");
-	    aprint(LINE_RANGE, COL_MID+34, v->selected_pages);
+	    aprint(LINE_RANGE, COL_MID+34, vv->selected_pages);
 	}
 	
 	switch(tseq[test].pat) {
@@ -907,8 +907,8 @@ int do_test(int my_ord)
 		    if (cpu_id.fid.bits.rdtsc) {
                 	asm __volatile__ ("rdtsc":"=a" (sp1),"=d" (sp2));
         	    } else {
-                	sp1 = 521288629 + v->pass;
-                	sp2 = 362436069 - v->pass;
+                	sp1 = 521288629 + vv->pass;
+                	sp2 = 362436069 - vv->pass;
         	    }
 		    rand_seed(sp1, sp2, 0);
 		}
@@ -1073,7 +1073,7 @@ int find_chunks(int tst)
 	        /* Find the memory areas I am going to test */
 		sg = compute_segments(twin, -1);
 		for(i = 0; i < sg; i++) {
-			len = v->map[i].end - v->map[i].start;
+			len = vv->map[i].end - vv->map[i].start;
 
 			if (cpu_mode == CPM_ALL && num_cpus > 1) {
 				switch(tseq[tst].pat) {
@@ -1102,9 +1102,9 @@ void find_ticks_for_pass(void)
 {
 	int i;
 
-	v->pptr = 0;
-	v->pass_ticks = 0;
-	v->total_ticks = 0;
+	vv->pptr = 0;
+	vv->pass_ticks = 0;
+	vv->total_ticks = 0;
 	cprint(1, COL_MID+8, "                                         ");
 	i = 0;
 	while (tseq[i].cpu_sel != 0) {
@@ -1113,7 +1113,7 @@ void find_ticks_for_pass(void)
 		    i++;
 		    continue;
 		}
-		v->pass_ticks += find_ticks_for_test(i);
+		vv->pass_ticks += find_ticks_for_test(i);
 		i++;
 	}
 }
@@ -1131,7 +1131,7 @@ static int find_ticks_for_test(int tst)
 
 	/* Set the number of iterations. We only do 1/2 of the iterations */
         /* on the first pass */
-	if (v->pass == 0) {
+	if (vv->pass == 0) {
 		c = tseq[tst].iter/FIRST_DIVISER;
 	} else {
 		c = tseq[tst].iter;
@@ -1197,20 +1197,20 @@ static int compute_segments(struct pmap win, int me)
 	sg = 0;
 
 	/* Now reduce my window to the area of memory I want to test */
-	if (wstart < v->plim_lower) {
-		wstart = v->plim_lower;
+	if (wstart < vv->plim_lower) {
+		wstart = vv->plim_lower;
 	}
-	if (wend > v->plim_upper) {
-		wend = v->plim_upper;
+	if (wend > vv->plim_upper) {
+		wend = vv->plim_upper;
 	}
 	if (wstart >= wend) {
 		return(0);
 	}
 	/* List the segments being tested */
-	for (i=0; i< v->msegs; i++) {
+	for (i=0; i< vv->msegs; i++) {
 		unsigned long start, end;
-		start = v->pmap[i].start;
-		end = v->pmap[i].end;
+		start = vv->pmap[i].start;
+		end = vv->pmap[i].end;
 		if (start <= wstart) {
 			start = wstart;
 		}
@@ -1231,9 +1231,9 @@ static int compute_segments(struct pmap win, int me)
 		cprint(LINE_SCROLL+(2*i), 42, ") ");
 
 		cprint(LINE_SCROLL+(2*i), 44, "p(");
-		hprint(LINE_SCROLL+(2*i), 46, v->plim_lower);
+		hprint(LINE_SCROLL+(2*i), 46, vv->plim_lower);
 		cprint(LINE_SCROLL+(2*i), 54, ", ");
-		hprint(LINE_SCROLL+(2*i), 56, v->plim_upper);
+		hprint(LINE_SCROLL+(2*i), 56, vv->plim_upper);
 		cprint(LINE_SCROLL+(2*i), 64, ") ");
 
 		cprint(LINE_SCROLL+(2*i+1),  0, "w(");
@@ -1243,9 +1243,9 @@ static int compute_segments(struct pmap win, int me)
 		cprint(LINE_SCROLL+(2*i+1), 20, ") ");
 
 		cprint(LINE_SCROLL+(2*i+1), 22, "m(");
-		hprint(LINE_SCROLL+(2*i+1), 24, v->pmap[i].start);
+		hprint(LINE_SCROLL+(2*i+1), 24, vv->pmap[i].start);
 		cprint(LINE_SCROLL+(2*i+1), 32, ", ");
-		hprint(LINE_SCROLL+(2*i+1), 34, v->pmap[i].end);
+		hprint(LINE_SCROLL+(2*i+1), 34, vv->pmap[i].end);
 		cprint(LINE_SCROLL+(2*i+1), 42, ") ");
 
 		cprint(LINE_SCROLL+(2*i+1), 44, "i=");
@@ -1259,12 +1259,12 @@ static int compute_segments(struct pmap win, int me)
 			"                                        ");
 #endif
 		if ((start < end) && (start < wend) && (end > wstart)) {
-			v->map[sg].pbase_addr = start;
-			v->map[sg].start = mapping(start);
-			v->map[sg].end = emapping(end);
+			vv->map[sg].pbase_addr = start;
+			vv->map[sg].start = mapping(start);
+			vv->map[sg].end = emapping(end);
 #if 0
 		hprint(LINE_SCROLL+(sg+1), 0, sg);
-		hprint(LINE_SCROLL+(sg+1), 12, v->map[sg].pbase_addr);
+		hprint(LINE_SCROLL+(sg+1), 12, vv->map[sg].pbase_addr);
 		hprint(LINE_SCROLL+(sg+1), 22, start);
 		hprint(LINE_SCROLL+(sg+1), 32, end);
 		hprint(LINE_SCROLL+(sg+1), 42, mapping(start));

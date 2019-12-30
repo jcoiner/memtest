@@ -32,7 +32,7 @@ static void memsize_linuxbios();
 void mem_size(void)
 {
 	int i, flag=0;
-	v->test_pages = 0;
+	vv->test_pages = 0;
 
 	/* Get the memory size from the BIOS */
         /* Determine the memory map */
@@ -63,8 +63,8 @@ void mem_size(void)
 
 	/* Guarantee that pmap entries are in ascending order */
 	sort_pmap();
-	v->plim_lower = 0;
-	v->plim_upper = v->pmap[v->msegs-1].end;
+	vv->plim_lower = 0;
+	vv->plim_upper = vv->pmap[vv->msegs-1].end;
 
 	adj_mem();
 }
@@ -75,10 +75,10 @@ static void sort_pmap(void)
 	/* Do an insertion sort on the pmap, on an already sorted
 	 * list this should be a O(1) algorithm.
 	 */
-	for(i = 0; i < v->msegs; i++) {
+	for(i = 0; i < vv->msegs; i++) {
 		/* Find where to insert the current element */
 		for(j = i -1; j >= 0; j--) {
-			if (v->pmap[i].start > v->pmap[j].start) {
+			if (vv->pmap[i].start > vv->pmap[j].start) {
 				j++;
 				break;
 			}
@@ -86,10 +86,10 @@ static void sort_pmap(void)
 		/* Insert the current element */
 		if (i != j) {
 			struct pmap temp;
-			temp = v->pmap[i];
-			memmove(&v->pmap[j], &v->pmap[j+1], 
+			temp = vv->pmap[i];
+			memmove(&vv->pmap[j], &vv->pmap[j+1], 
 				(i -j)* sizeof(temp));
-			v->pmap[j] = temp;
+			vv->pmap[j] = temp;
 		}
 	}
 }
@@ -106,12 +106,12 @@ static void memsize_linuxbios(void)
 		}
 		end = e820[i].addr;
 		end += e820[i].size;
-		v->pmap[n].start = (e820[i].addr + 4095) >> 12;
-		v->pmap[n].end = end >> 12;
-		v->test_pages += v->pmap[n].end - v->pmap[n].start;
+		vv->pmap[n].start = (e820[i].addr + 4095) >> 12;
+		vv->pmap[n].end = end >> 12;
+		vv->test_pages += vv->pmap[n].end - vv->pmap[n].start;
 		n++;
 	}
-	v->msegs = n;
+	vv->msegs = n;
 }
 static void memsize_820()
 {
@@ -146,22 +146,22 @@ static void memsize_820()
 			if (end > RES_START && end < RES_END) {
 				end = RES_START;
 			}
-			v->pmap[n].start = (start + 4095) >> 12;
-			v->pmap[n].end = end >> 12;
-			v->test_pages += v->pmap[n].end - v->pmap[n].start;
+			vv->pmap[n].start = (start + 4095) >> 12;
+			vv->pmap[n].end = end >> 12;
+			vv->test_pages += vv->pmap[n].end - vv->pmap[n].start;
 			n++;
 #if 0			
 	 		int epmap = 0;
 	 		int lpmap = 0;
 	 		if(n > 12) { epmap = 34; lpmap = -12; }
-			hprint (11+n+lpmap,0+epmap,v->pmap[n-1].start);
-			hprint (11+n+lpmap,10+epmap,v->pmap[n-1].end);
-			hprint (11+n+lpmap,20+epmap,v->pmap[n-1].end - v->pmap[n-1].start);
+			hprint (11+n+lpmap,0+epmap,vv->pmap[n-1].start);
+			hprint (11+n+lpmap,10+epmap,vv->pmap[n-1].end);
+			hprint (11+n+lpmap,20+epmap,vv->pmap[n-1].end - vv->pmap[n-1].start);
 			dprint (11+n+lpmap,30+epmap,nm[i].type,0,0);	
 #endif				
 		}
 	}
-	v->msegs = n;
+	vv->msegs = n;
 }
 	
 static void memsize_801(void)
@@ -177,15 +177,15 @@ static void memsize_801(void)
 		mem_size = alt_mem_k;
 	}
 	/* First we map in the first 640k */
-	v->pmap[0].start = 0;
-	v->pmap[0].end = RES_START >> 12;
-	v->test_pages = RES_START >> 12;
+	vv->pmap[0].start = 0;
+	vv->pmap[0].end = RES_START >> 12;
+	vv->test_pages = RES_START >> 12;
 
 	/* Now the extended memory */
-	v->pmap[1].start = (RES_END + 4095) >> 12;
-	v->pmap[1].end = (mem_size + 1024) >> 2;
-	v->test_pages += mem_size >> 2;
-	v->msegs = 2;
+	vv->pmap[1].start = (RES_END + 4095) >> 12;
+	vv->pmap[1].end = (mem_size + 1024) >> 2;
+	vv->test_pages += mem_size >> 2;
+	vv->msegs = 2;
 }
 
 /*

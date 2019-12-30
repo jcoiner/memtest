@@ -173,34 +173,34 @@ unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base) {
  */
 void scroll(void) 
 {
-	int i, j;
-	char *s, tmp;
+    int i, j;
+    char *s, tmp;
 
-	/* Only scroll if at the bottom of the screen */
-	if (v->msg_line < 23) {
-		v->msg_line++;
-	} else {
-		/* If scroll lock is on, loop till it is cleared */
-		while (slock) {
-			check_input();
-		}
-	        for (i=LINE_SCROLL; i<23; i++) {
-			s = (char *)(SCREEN_ADR + ((i+1) * 160));
-			for (j=0; j<160; j+=2, s+=2) {
-				*(s-160) = *s;
-                                tmp = get_scrn_buf(i+1, j/2);
-                                set_scrn_buf(i, j/2, tmp);
-			}
-		}
-		/* Clear the newly opened line */
-		s = (char *)(SCREEN_ADR + (23 * 160));
-		for (j=0; j<80; j++) {
-			*s = ' ';
-                        set_scrn_buf(23, j, ' ');
-			s += 2;
-		}
-                tty_print_region(LINE_SCROLL, 0, 23, 79);
+    /* Only scroll if at the bottom of the screen */
+    if (vv->msg_line < 23) {
+        vv->msg_line++;
+    } else {
+        /* If scroll lock is on, loop till it is cleared */
+        while (slock) {
+            check_input();
         }
+        for (i=LINE_SCROLL; i<23; i++) {
+            s = (char *)(SCREEN_ADR + ((i+1) * 160));
+            for (j=0; j<160; j+=2, s+=2) {
+                *(s-160) = *s;
+                tmp = get_scrn_buf(i+1, j/2);
+                set_scrn_buf(i, j/2, tmp);
+            }
+        }
+        /* Clear the newly opened line */
+        s = (char *)(SCREEN_ADR + (23 * 160));
+        for (j=0; j<80; j++) {
+            *s = ' ';
+            set_scrn_buf(23, j, ' ');
+            s += 2;
+        }
+        tty_print_region(LINE_SCROLL, 0, 23, 79);
+    }
 }
 
 /*

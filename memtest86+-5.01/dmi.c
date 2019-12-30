@@ -408,14 +408,14 @@ void print_dmi_err(void){
 	
 	scroll();
 	
-	cprint(v->msg_line, 0,"Bad Memory Devices: ");
+	cprint(vv->msg_line, 0,"Bad Memory Devices: ");
 	of=20;
 	for ( i=count=0; i < MAX_DMI_MEMDEVS; i++){
 		if (!dmi_err_cnts[i])
 			continue;
 		struct mem_dev *md = mem_devs[i];
 		if(count++){
-			cprint(v->msg_line, of, ", ");
+			cprint(vv->msg_line, of, ", ");
 			of+=2;
 		}
 		string=get_tstruct_string((struct tstruct_header *)md,md->dev_locator);
@@ -423,7 +423,7 @@ void print_dmi_err(void){
 			scroll();
 			of=7;
 		}
-		cprint(v->msg_line, of, string);
+		cprint(vv->msg_line, of, string);
 		of += strlen(string);
 	}
 }

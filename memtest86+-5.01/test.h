@@ -205,62 +205,62 @@ struct pair {
 
 static inline void cache_off(void)
 {
-        asm(
-		"push %eax\n\t"
-		"movl %cr0,%eax\n\t"
-    "orl $0x40000000,%eax\n\t"  /* Set CD */
-    "movl %eax,%cr0\n\t"
-		"wbinvd\n\t"
-		"pop  %eax\n\t");
+    asm(
+        "push %eax\n\t"
+        "movl %cr0,%eax\n\t"
+        "orl $0x40000000,%eax\n\t"  /* Set CD */
+        "movl %eax,%cr0\n\t"
+        "wbinvd\n\t"
+        "pop  %eax\n\t");
 }
 
 static inline void cache_on(void)
 {
-        asm(
-		"push %eax\n\t"
-		"movl %cr0,%eax\n\t"
-    "andl $0x9fffffff,%eax\n\t" /* Clear CD and NW */ 
-    "movl %eax,%cr0\n\t"
-		"pop  %eax\n\t");
+    asm(
+        "push %eax\n\t"
+        "movl %cr0,%eax\n\t"
+        "andl $0x9fffffff,%eax\n\t" /* Clear CD and NW */ 
+        "movl %eax,%cr0\n\t"
+        "pop  %eax\n\t");
 }
 
 struct mmap {
-	ulong pbase_addr;
-	ulong *start;
-	ulong *end;
+    ulong pbase_addr;
+    ulong *start;
+    ulong *end;
 };
 
 struct pmap {
-	ulong start;
-	ulong end;
+    ulong start;
+    ulong end;
 };
 
 struct tseq {
-	short sel;
-	short cpu_sel;
-	short pat;
-	short iter;
-	short errors;
-	char *msg;
+    short sel;
+    short cpu_sel;
+    short pat;
+    short iter;
+    short errors;
+    char *msg;
 };
 
 struct xadr {
-	ulong page;
-	ulong offset;
+    ulong page;
+    ulong offset;
 };
 
 struct err_info {
-	struct xadr   low_addr;
-	struct xadr   high_addr;
-	unsigned long ebits;
-	long	      tbits;
-	short         min_bits;
-	short         max_bits;
-	unsigned long maxl;
-	unsigned long eadr;
-        unsigned long exor;
-        unsigned long cor_err;
-	short         hdr_flag;
+    struct xadr   low_addr;
+    struct xadr   high_addr;
+    unsigned long ebits;
+    long	      tbits;
+    short         min_bits;
+    short         max_bits;
+    unsigned long maxl;
+    unsigned long eadr;
+    unsigned long exor;
+    unsigned long cor_err;
+    short         hdr_flag;
 };
 
 
@@ -269,46 +269,46 @@ struct err_info {
 
 #define MAX_MEM_SEGMENTS E820MAX
 
-/* Define common variables accross relocations of memtest86 */
+/* Define common variables across relocations of memtest86 */
 struct vars {
-	int pass;
-	int msg_line;
-	int ecount;
-	int ecc_ecount;
-	int msegs;
-	int testsel;
-	int scroll_start;
-	int pass_ticks;
-	int total_ticks;
-	int pptr;
-	int tptr;
-	struct err_info erri;
-	struct pmap pmap[MAX_MEM_SEGMENTS];
-	volatile struct mmap map[MAX_MEM_SEGMENTS];
-	ulong plim_lower;
-	ulong plim_upper;
-	ulong clks_msec;
-	ulong starth;
-	ulong startl;
-	ulong snaph;
-	ulong snapl;
-	int printmode;
-	int numpatn;
-	struct pair patn [BADRAM_MAXPATNS];
-	ulong test_pages;
-	ulong selected_pages;
-	ulong reserved_pages;
-	int check_temp;
-	int fail_safe;
-	int each_sec;
-	int beepmode;
+    int pass;
+    int msg_line;
+    int ecount;
+    int ecc_ecount;
+    int msegs;
+    int testsel;
+    int scroll_start;
+    int pass_ticks;
+    int total_ticks;
+    int pptr;
+    int tptr;
+    struct err_info erri;
+    struct pmap pmap[MAX_MEM_SEGMENTS];
+    volatile struct mmap map[MAX_MEM_SEGMENTS];
+    ulong plim_lower;
+    ulong plim_upper;
+    ulong clks_msec;
+    ulong starth;
+    ulong startl;
+    ulong snaph;
+    ulong snapl;
+    int printmode;
+    int numpatn;
+    struct pair patn [BADRAM_MAXPATNS];
+    ulong test_pages;
+    ulong selected_pages;
+    ulong reserved_pages;
+    int check_temp;
+    int fail_safe;
+    int each_sec;
+    int beepmode;
 };
 
 #define FIRMWARE_UNKNOWN   0
 #define FIRMWARE_PCBIOS    1
 #define FIRMWARE_LINUXBIOS 2
 
-extern struct vars * const v;
+extern struct vars * const vv;
 extern unsigned char _start[], _end[], startup_32[];
 extern unsigned char _size, _pages;
 
