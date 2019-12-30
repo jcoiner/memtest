@@ -47,19 +47,20 @@ int		find_chunks(int test);
 static void	test_setup(void);
 static int	compute_segments(struct pmap map, int cpu);
 int		do_test(int ord);
-struct tseq tseq[] = {
-                      {1, -1,  0,   6, 0, "[Address test, walking ones, no cache] "},
-                      {1, -1,  1,   6, 0, "[Address test, own address Sequential] "},
-                      {1, 32,  2,   6, 0, "[Address test, own address Parallel]   "},
-                      {1, 32,  3,   6, 0, "[Moving inversions, 1s & 0s Parallel]  "},
-                      {1, 32,  5,   3, 0, "[Moving inversions, 8 bit pattern]     "},
-                      {1, 32,  6,  30, 0, "[Moving inversions, random pattern]    "},
-                      {1, 32,  7,  81, 0, "[Block move]                           "}, 
-                      {1,  1,  8,   3, 0, "[Moving inversions, 32 bit pattern]    "}, 
-                      {1, 32,  9,  48, 0, "[Random number sequence]               "},
-                      {1, 32, 10,   6, 0, "[Modulo 20, Random pattern]            "},
-                      {1, 1,  11, 240, 0, "[Bit fade test, 2 patterns]            "},
-                      {1, 0,   0,   0, 0, NULL}
+struct tseq tseq[] =
+    {
+     {1, -1,  0,   6, 0, "[Address test, walking ones, no cache] "},
+     {1, -1,  1,   6, 0, "[Address test, own address Sequential] "},
+     {1, 32,  2,   6, 0, "[Address test, own address Parallel]   "},
+     {1, 32,  3,   6, 0, "[Moving inversions, 1s & 0s Parallel]  "},
+     {1, 32,  5,   3, 0, "[Moving inversions, 8 bit pattern]     "},
+     {1, 32,  6,  30, 0, "[Moving inversions, random pattern]    "},
+     {1, 32,  7,  81, 0, "[Block move]                           "}, 
+     {1,  1,  8,   3, 0, "[Moving inversions, 32 bit pattern]    "}, 
+     {1, 32,  9,  48, 0, "[Random number sequence]               "},
+     {1, 32, 10,   6, 0, "[Modulo 20, Random pattern]            "},
+     {1, 1,  11, 240, 0, "[Bit fade test, 2 patterns]            "},
+     {1, 0,   0,   0, 0, NULL}
 };
 
 volatile int    mstr_cpu;
@@ -385,7 +386,8 @@ void clear_screen()
     }
 
 }
-/* This is the test entry point. We get here on statup and also whenever
+
+/* Test entry point. We get here on startup and also whenever
  * we relocate. */
 void test_start(void)
 {
@@ -496,7 +498,8 @@ void test_start(void)
                  : "ax"
                  );
 
-        btrace(my_cpu_num, __LINE__, "Mem Mgmnt ", 1, cpu_id.fid.bits.pae, cpu_id.fid.bits.lm);
+        btrace(my_cpu_num, __LINE__, "Mem Mgmnt ",
+               1, cpu_id.fid.bits.pae, cpu_id.fid.bits.lm);
         /* Setup memory management modes */
         /* If we have PAE, turn it on */
         if (cpu_id.fid.bits.pae == 1) {
@@ -768,7 +771,9 @@ void test_start(void)
                 /* If onepass is enabled and we did not get any errors
                  * reboot to exit the test */
                 if (onepass) {	reboot();   }
-                if (!btflag) cprint(LINE_MSG, COL_MSG-8, "** Pass complete, no errors, press Esc to exit **");
+                if (!btflag)
+                    cprint(LINE_MSG, COL_MSG-8,
+                           "** Pass complete, no errors, press Esc to exit **");
                 if(BEEP_END_NO_ERROR) 
                 {
                     beep(1000);
@@ -833,13 +838,13 @@ int do_test(int my_ord)
         if ((ulong)&_start > LOW_TEST_ADR) {
             /* Relocated so we need to test all selected lower memory */
             vv->map[0].start = mapping(vv->plim_lower);
-		
+
             /* Good 'ol Legacy USB_WAR */
             if (vv->map[0].start < (ulong*)0x500) 
             {
                 vv->map[0].start = (ulong*)0x500;
             }
-		
+
             cprint(LINE_PAT, COL_MID+25, " R");
         } else {
             cprint(LINE_PAT, COL_MID+25, "  ");
