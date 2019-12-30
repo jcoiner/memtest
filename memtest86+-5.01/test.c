@@ -14,7 +14,7 @@
 #include "stdint.h"
 #include "cpuid.h"
 #include "smp.h"
-#include <sys/io.h>
+//#include <sys/io.h>
 
 extern struct cpu_ident cpu_id;
 extern volatile int    mstr_cpu;
@@ -1550,7 +1550,11 @@ void sleep(long n, int flag, int me, int sms)
 
 void beep(unsigned int frequency)
 {
-	
+#if 1
+    // BOZO(jcoiner)
+    // Removed this, pending a correct definition
+    // of outb_p()
+#else
 	unsigned int count = 1193180 / frequency;
 
 	// Switch on the speaker
@@ -1568,4 +1572,5 @@ void beep(unsigned int frequency)
 
 	// Switch off the speaker
 	outb(inb_p(0x61)&0xFC, 0x61);
+#endif
 }
