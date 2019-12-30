@@ -114,8 +114,8 @@ void addr_tst1(int me)
             } while(mask);
         }
         do_tick(me);
-        BAILR
-            }
+        { BAILR }
+    }
 
     /* Now check the address bits in each bank */
     /* If we have more than 8mb of memory then the bank size must be */
@@ -169,8 +169,8 @@ void addr_tst1(int me)
             }
         }
         do_tick(me);
-        BAILR
-            p1 = ~p1;
+        { BAILR }
+        p1 = ~p1;
     }
 }
 
@@ -193,14 +193,14 @@ void addr_tst2(int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
-
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            { BAILR }
+            
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -238,14 +238,14 @@ void addr_tst2(int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -326,14 +326,14 @@ void movinvr(int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -379,14 +379,14 @@ void movinvr(int me)
             done = 0;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for overflow */
-                    if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                        pe += SPINSZ_DWORDS;
-                    } else {
-                        pe = end;
-                    }
+                /* Check for overflow */
+                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                    pe += SPINSZ_DWORDS;
+                } else {
+                    pe = end;
+                }
                 if (pe >= end) {
                     pe = end;
                     done++;
@@ -505,20 +505,19 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
     for (j=0; j<segs; j++) {
         calculate_chunk(&start, &end, me, j, 4);
 
-
         pe = start;
         p = start;
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -555,14 +554,14 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
             done = 0;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for overflow */
-                    if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                        pe += SPINSZ_DWORDS;
-                    } else {
-                        pe = end;
-                    }
+                /* Check for overflow */
+                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                    pe += SPINSZ_DWORDS;
+                } else {
+                    pe = end;
+                }
                 if (pe >= end) {
                     pe = end;
                     done++;
@@ -623,15 +622,15 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
             done = 0;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for underflow */
-                    if (pe - SPINSZ_DWORDS < pe && pe != 0) {
-                        pe -= SPINSZ_DWORDS;
-                    } else {
-                        pe = start;
-                        done++;
-                    }
+                /* Check for underflow */
+                if (pe - SPINSZ_DWORDS < pe && pe != 0) {
+                    pe -= SPINSZ_DWORDS;
+                } else {
+                    pe = start;
+                    done++;
+                }
 
                 /* Since we are using unsigned addresses a 
                  * redundent check is required */
@@ -710,14 +709,14 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
         pat = p1;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -779,14 +778,14 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
             pat = p1;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for overflow */
-                    if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                        pe += SPINSZ_DWORDS;
-                    } else {
-                        pe = end;
-                    }
+                /* Check for overflow */
+                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                    pe += SPINSZ_DWORDS;
+                } else {
+                    pe = end;
+                }
                 if (pe >= end) {
                     pe = end;
                     done++;
@@ -885,15 +884,15 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
             done = 0;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for underflow */
-                    if (pe - SPINSZ_DWORDS < pe && pe != 0) {
-                        pe -= SPINSZ_DWORDS;
-                    } else {
-                        pe = start;
-                        done++;
-                    }
+                /* Check for underflow */
+                if (pe - SPINSZ_DWORDS < pe && pe != 0) {
+                    pe -= SPINSZ_DWORDS;
+                } else {
+                    pe = start;
+                    done++;
+                }
                 /* We need this redundant check because we are
                  * using unsigned longs for the address.
                  */
@@ -1006,14 +1005,14 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1051,14 +1050,14 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
             k = 0;
             do {
                 do_tick(me);
-                BAILR
+                { BAILR }
 
-                    /* Check for overflow */
-                    if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                        pe += SPINSZ_DWORDS;
-                    } else {
-                        pe = end;
-                    }
+                /* Check for overflow */
+                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                    pe += SPINSZ_DWORDS;
+                } else {
+                    pe = end;
+                }
                 if (pe >= end) {
                     pe = end;
                     done++;
@@ -1112,14 +1111,14 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
         end -= MOD_SZ;	/* adjust the ending address */
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1173,6 +1172,16 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
  */
+
+/* TODO(jcoiner):
+ * 
+ *  - Figure out how to write an assert
+ *    * Answer: call error(), and probably sleep so we can see it
+ *      before it scrolls away. Make a function for this.
+ *  - Assert that:
+ *    * chunks don't overlap
+ *    * chunk start and end addresses are page-aligned
+ */
 void block_move(int iter, int me)
 {
     int i, j, done;
@@ -1196,14 +1205,14 @@ void block_move(int iter, int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1211,8 +1220,24 @@ void block_move(int iter, int me)
             if (p == pe ) {
                 break;
             }
+
+            // p is the start address, and pe the end address,
+            // for the current loop iteration.
+            //
+            // which means 'len' is in units of 64-byte cache lines:
             len  = ((ulong)pe - (ulong)p) / 64;
-            //len++;
+
+            // TODO(jcoiner):
+            // From a normal functional-analysis perspective,
+            // we only need to initialize len/2, since we're going to
+            // Since we're going to use movsl to copy the first half
+            // onto the second half next.
+            //
+            // However: do we actually derive coverage from writing
+            // the 2nd half of the block, and then writing it again?
+            // Is that a difficult operation for memory, to be
+            // rewritten with the same value it contained already? TBD.
+
             asm __volatile__
                 (
                  "jmp L100\n\t"
@@ -1294,8 +1319,8 @@ void block_move(int iter, int me)
             len  = ((ulong)pe - (ulong)p) / 8; // Half the size of this block in DWORDS
             for(i=0; i<iter; i++) {
                 do_tick(me);
-                BAILR
-                    asm __volatile__
+                { BAILR }
+                asm __volatile__
                     (
                      "cld\n"
                      "jmp L110\n\t"
@@ -1310,7 +1335,7 @@ void block_move(int iter, int me)
                      //
 
                      // Move first half to second half
-                     "movl %1,%%edi\n\t" // Destionation, pp (mid point)
+                     "movl %1,%%edi\n\t" // Destination, pp (mid point)
                      "movl %0,%%esi\n\t" // Source, p (start point)
                      "movl %2,%%ecx\n\t" // Length, len (size of a half in DWORDS)
                      "rep\n\t"
@@ -1318,17 +1343,17 @@ void block_move(int iter, int me)
 
                      // Move the second half, less the last 32-bytes. To the first half, offset plus 32-bytes
                      "movl %0,%%edi\n\t"
-                     "addl $32,%%edi\n\t"	// Destination, p(start-point) plus 32 bytes
-                     "movl %1,%%esi\n\t"		// Source, pp(mid-point)
+                     "addl $32,%%edi\n\t" // Destination, p(start-point) plus 32 bytes
+                     "movl %1,%%esi\n\t"  // Source, pp(mid-point)
                      "movl %2,%%ecx\n\t"
-                     "subl $8,%%ecx\n\t"		// Length, len(size of a half in DWORDS) minus 8 DWORDS (32 bytes)
+                     "subl $8,%%ecx\n\t"  // Length, len(size of a half in DWORDS) minus 8 DWORDS (32 bytes)
                      "rep\n\t"
                      "movsl\n\t"
 
                      // Move last 8 DWORDS (32-bytes) of the second half to the start of the first half
-                     "movl %0,%%edi\n\t"		// Destination, p(start-point)
+                     "movl %0,%%edi\n\t"  // Destination, p(start-point)
                      // Source, 8 DWORDS from the end of the second half, left over by the last rep/movsl
-                     "movl $8,%%ecx\n\t"		// Length, 8 DWORDS (32-bytes)
+                     "movl $8,%%ecx\n\t"  // Length, 8 DWORDS (32-bytes)
                      "rep\n\t"
                      "movsl\n\t"
 
@@ -1355,14 +1380,14 @@ void block_move(int iter, int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1433,14 +1458,14 @@ void bit_fade_fill(ulong p1, int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1472,14 +1497,14 @@ void bit_fade_chk(ulong p1, int me)
         done = 0;
         do {
             do_tick(me);
-            BAILR
+            { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
             if (pe >= end) {
                 pe = end;
                 done++;
@@ -1497,9 +1522,6 @@ void bit_fade_chk(ulong p1, int me)
         } while (!done);
     }
 }
-
-
-
 
 /* Sleep for N seconds */
 void sleep(long n, int flag, int me, int sms)
@@ -1542,8 +1564,8 @@ void sleep(long n, int flag, int me, int sms)
 
         if (t != ip) {
             do_tick(me);
-            BAILR
-                ip = t;
+            { BAILR }
+            ip = t;
         }
     }
 }
