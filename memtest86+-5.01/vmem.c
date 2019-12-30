@@ -115,32 +115,28 @@ int map_page(unsigned long page)
     return 0;
 }
 
-void *mapping(unsigned long page_addr)
+void *mapping(unsigned long phys_page)
 {
     void *result;
-    if (page_addr < WIN_SZ_PAGES) {
+    if (phys_page < WIN_SZ_PAGES) {
         /* If the page is below 2GB, address it directly */
-        result = (void *)(page_addr << 12);
+        result = (void *)(phys_page << 12);
     }
     else {
         // Higher physical pages map to a virtual address
         // in the 2G-4G range.
-        //
-        // TODO(jcoiner):
-        //  Once I'm really sure that the arg is a physical page
-        //  number, rename it to 'phys_page' ?
         unsigned long alias;
-        alias = page_addr & 0x7FFFF;
+        alias = phys_page & 0x7FFFF;
         alias += 0x80000;
         result = (void *)(alias << 12);
     }
     return result;
 }
 
-void *emapping(unsigned long page_addr)
+void *emapping(unsigned long phys_page)
 {
     void *result;
-    result = mapping(page_addr -1);
+    result = mapping(phys_page - 1);
     /* Fill in the low address bits */
     result = ((unsigned char *)result) + 0xffc;
     return result;

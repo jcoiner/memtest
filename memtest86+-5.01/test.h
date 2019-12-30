@@ -180,8 +180,8 @@ void clear_screen(void);
 void paging_off(void);
 void show_spd(void);
 int map_page(unsigned long page);
-void *mapping(unsigned long page_address);
-void *emapping(unsigned long page_address);
+void *mapping(unsigned long phys_page);   // get VA for a physical page
+void *emapping(unsigned long phys_page);
 int isdigit(char c);
 ulong memspeed(ulong src, ulong len, int iter);
 unsigned long page_of(void *ptr);
@@ -226,8 +226,8 @@ static inline void cache_on(void)
 
 struct mmap {
     ulong pbase_addr;
-    ulong *start;
-    ulong *end;
+    ulong *start;  // VA of segment start
+    ulong *end;    // VA of segment end
 };
 
 struct pmap {
@@ -285,8 +285,8 @@ struct vars {
     struct err_info erri;
     struct pmap pmap[MAX_MEM_SEGMENTS];
     volatile struct mmap map[MAX_MEM_SEGMENTS];
-    ulong plim_lower;
-    ulong plim_upper;
+    ulong plim_lower;  // phys page number
+    ulong plim_upper;  // phys page number
     ulong clks_msec;
     ulong starth;
     ulong startl;

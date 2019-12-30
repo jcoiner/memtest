@@ -33,7 +33,8 @@ static inline ulong roundup(ulong value, ulong mask)
     return (value + mask) & ~mask;
 }
 
-// start / end - return values for range to test
+// Writes *start and *end with the VA range to test.
+//
 // me - this threads CPU number
 // j - index into v->map for current segment we are testing
 // align - number of bytes to align each block to

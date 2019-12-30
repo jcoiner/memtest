@@ -860,10 +860,10 @@ int do_test(int my_ord)
         cprint(LINE_RANGE, COL_MID+30, " of ");
         aprint(LINE_RANGE, COL_MID+34, vv->selected_pages);
     }
-	
+
     switch(tseq[test].pat) {
 
-	/* Do the testing according to the selected pattern */
+	/* do the testing according to the selected pattern */
 
     case 0: /* Address test, walking ones (test #0) */
         /* Run with cache turned off */
