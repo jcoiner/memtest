@@ -47,8 +47,7 @@ void calculate_chunk(ulong** start, ulong** end, int me,
     if (run_cpus == 1) {
         *start = vv->map[j].start;
         *end = vv->map[j].end;
-    } 
-    else{
+    } else {
 
         // Divide the current segment by the number of CPUs
         chunk = (ulong)vv->map[j].end-(ulong)vv->map[j].start;
@@ -1178,8 +1177,8 @@ void block_move(int iter, int me)
 {
     int i, j, done;
     ulong len;
-    ulong *p, *pe, pp;
-    ulong *start, *end;
+    ulong pp;
+    ulong *p, *pe, *start, *end;  // VAs
 
     cprint(LINE_PAT, COL_PAT-2, "          ");
 
@@ -1187,7 +1186,8 @@ void block_move(int iter, int me)
     for (j=0; j<segs; j++) {
         calculate_chunk(&start, &end, me, j, 64);
 
-        // end is always xxxxxffc, so increment so that length calculations are correct
+        // end is always xxxxxffc, so increment so that length
+        // calculations are correct
         end = end + 1;
 
         pe = start;
