@@ -39,9 +39,9 @@ typedef unsigned long ulong;
 #define STACKSIZE_BYTES (8*1024)
 #define MAX_MEM_PAGES   0x7FF00000      /* 8 TB; units are 4K pages */
 #define WIN_SZ_PAGES    0x80000         /* 2 GB; units are 4K pages */
-#define UNMAP_SZ_PAGES  (0x100000-WIN_SZ_PAGES)  /* Size of umapped first segment */
+#define UNMAP_SZ_PAGES  (0x100000-WIN_SZ_PAGES)  /* Size of unmapped first segment */
 
-#define SPINSZ		0x4000000	/* 256 MB */
+#define SPINSZ_DWORDS	0x4000000	/* 256 MB; units are dwords (32-bit words) */
 #define MOD_SZ		20
 #define BAILOUT		if (bail) return(1);
 #define BAILR		if (bail) return;

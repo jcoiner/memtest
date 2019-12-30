@@ -1,5 +1,6 @@
 *.o
 *.s
 *.bin
+*~
 memtest
 memtest_shared
