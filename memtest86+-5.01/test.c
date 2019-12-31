@@ -1364,51 +1364,16 @@ void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
 }
 
 void block_move_check(ulong* p, ulong len_dw, int iter, int me) {
-    /* Now check the data 
-     * The error checking is rather crude.  We just check that the
+    /* Now check the data.
+     *
+     * This is rather crude, we just check that the
      * adjacent words are the same.
      */
-
-    // The last dwords to test are pe[0] and pe[1]
-    ulong* pe = p + (len_dw - 2);
-
-    asm __volatile__
-        (
-         "jmp L120\n\t"
-
-         ".p2align 4,,7\n\t"
-         "L124:\n\t"
-         "addl $8,%%edi\n\t" // Next QWORD
-         "L120:\n\t"
-
-         // Compare adjacent DWORDS
-         "movl (%%edi),%%ecx\n\t"
-         "cmpl 4(%%edi),%%ecx\n\t"
-         "jnz L121\n\t" // Print error if they don't match
-
-         // Loop until end of block
-         "L122:\n\t"
-         "cmpl %%edx,%%edi\n\t"
-         "jb L124\n"
-         "jmp L123\n\t"
-
-         "L121:\n\t"
-         // eax not used so we don't need to save it as per cdecl
-         // ecx is used but not restored, however we don't need it's value anymore after this point
-         "pushl %%edx\n\t"
-         "pushl 4(%%edi)\n\t"
-         "pushl %%ecx\n\t"
-         "pushl %%edi\n\t"
-         "call error\n\t"
-         "popl %%edi\n\t"
-         "addl $8,%%esp\n\t"
-         "popl %%edx\n\t"
-         "jmp L122\n"
-         "L123:\n\t"
-         : "=D" (p)
-         : "D" (p), "d" (pe)
-         : "ecx"
-         );
+    for (ulong i = 0; i < len_dw; i = i + 2) {
+        if (p[i] != p[i+1]) {
+            error(p+i, p[i], p[i+1]);
+        }
+    }
 }
 
 /*
