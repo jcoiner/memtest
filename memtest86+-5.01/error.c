@@ -28,20 +28,50 @@ static void print_err_counts(void);
 static void common_err();
 static int syn, chan, len=1;
 
+static void paint_line(int msg_line, unsigned vga_color) {
+    if (msg_line < 24) {
+        char* pp;
+        int i;
+        for(i=0, pp=(char *)((SCREEN_ADR+msg_line*160+1));
+            i<76; i++, pp+=2) {
+            *pp = vga_color;
+        }
+    }
+}
+
+/*
+ * Report an assertion failure. This is typically NOT a memory error.
+ */
+void assert_fail(const char* file, int line_no) {
+     spin_lock(&barr->mutex);
+
+     scroll();
+     cprint(vv->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
+     dprint(vv->msg_line, 31, line_no, 5, 1);
+     cprint(vv->msg_line, 37, file);
+     paint_line(vv->msg_line, 0x0E /* yellow on black */);
+
+     spin_unlock(&barr->mutex);
+
+     // Ensure the message remains visible for a while
+     // before it scrolls away. Assert-fails should be rare
+     // and may indicate that subsequent result aren't valid.
+     sleep(60, 0, 0, 0);
+}
+
 /*
  * Display data error message. Don't display duplicate errors.
  */
 void error(ulong *adr, ulong good, ulong bad)
 {
-	
     ulong xor;
 
     spin_lock(&barr->mutex);
-	
+
     xor = good ^ bad;
 
 #ifdef USB_WAR
-    /* Skip any errrors that appear to be due to the BIOS using location
+    /* Skip any errors that appear to be due to the BIOS using location
      * 0x4e0 for USB keyboard support.  This often happens with Intel
      * 810, 815 and 820 chipsets.  It is possible that we will skip
      * a real error but the odds are very low.
@@ -51,24 +81,9 @@ void error(ulong *adr, ulong good, ulong bad)
     }
 #endif
 
-    /* A sporadic bug exists in test #6, with SMP enabled, that
-     * reports false positives on < 65K-0.5MB range. I was
-     * not able to solve this. After investigations, it seems
-     * related to a BIOS issue similiar to the one solved by 
-     * USB_WAR, but for MP Table.
-     */
-    /* Solved 
-       if (test == 6 && (ulong)adr <= 0x07FFFF && num_cpus > 1) 
-       {
-       cprint(6,78,"-"); // Debug
-       return;
-       }
-    */
     common_err(adr, good, bad, xor, 0);
     spin_unlock(&barr->mutex);
 }
-
-
 
 /*
  * Display address error message.
@@ -107,14 +122,10 @@ static void update_err_counts(void)
     }
     ++(vv->ecount);
     tseq[test].errors++;
-		
 }
 
 static void print_err_counts(void)
 {
-    int i;
-    char *pp;
-
     if ((vv->ecount > 4096) && (vv->ecount % 256 != 0)) return;
 
     dprint(LINE_INFO, 72, vv->ecount, 6, 0);
@@ -125,12 +136,8 @@ static void print_err_counts(void)
     /* Paint the error messages on the screen red to provide a vivid */
     /* indicator that an error has occured */ 
     if ((vv->printmode == PRINTMODE_ADDRESSES ||
-         vv->printmode == PRINTMODE_PATTERNS) &&
-        vv->msg_line < 24) {
-        for(i=0, pp=(char *)((SCREEN_ADR+vv->msg_line*160+1));
-            i<76; i++, pp+=2) {
-            *pp = 0x47;
-        }
+         vv->printmode == PRINTMODE_PATTERNS)) {
+        paint_line(vv->msg_line, 0x47 /* gray-on-red */);
     }
 }
 
@@ -170,7 +177,7 @@ void common_err( ulong *adr, ulong good, ulong bad, ulong xor, int type)
             page = page_of(adr);
             offset = (ulong)adr & 0xFFF;
         }
-			
+
         /* Calc upper and lower error addresses */
         if (vv->erri.low_addr.page > page) {
             vv->erri.low_addr.page = page;
@@ -620,4 +627,3 @@ void do_tick(int me)
       poll_errors();
     */
 }
-

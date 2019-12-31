@@ -1173,13 +1173,6 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
         assert_fail(__FILE__, __LINE__); \
     } } while(0);
 
-static void assert_fail(const char* file, int line_no) {
-    error((ulong*)0xABADDADD, 0, line_no);
-
-    // Ensure the report remains visible for a while...
-    sleep(60, 0, 0, 1);
-}
-
 void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
@@ -1224,6 +1217,8 @@ void block_move_foreach_segment
         // Ensure no overlap among chunks
         ASSERT(prev_end < start);
         prev_end = end;
+
+        ASSERT(0); // bozo
 
         // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
         // To avoid overflow in our loop tests and length calculations,
@@ -1473,7 +1468,8 @@ void bit_fade_chk(ulong p1, int me)
 }
 
 /* Sleep for N seconds */
-void sleep(long n, int flag, int me, int sms)
+void sleep(long n, int flag, int me,
+           int sms /* interpret 'n' as milliseconds instead */)
 {
     ulong sh, sl, l, h, t, ip=0;
 
@@ -1500,7 +1496,7 @@ void sleep(long n, int flag, int me, int sms)
             t = h * ((unsigned)0xffffffff / vv->clks_msec) / 1000;
             t += (l / vv->clks_msec) / 1000;
         }
-		
+
         /* Is the time up? */
         if (t >= n) {
             break;
