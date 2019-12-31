@@ -1263,85 +1263,32 @@ void block_move_foreach_segment
 
 void block_move_init(ulong* p, ulong* pe, int iter, int me) {
     // p is the start address, and pe the end address,
-    // for the current loop iteration.
+    // for the current segment.
     //
-    // which means 'len' is in units of 64-byte cache lines:
+    // Thus 'len' is in units of 64-byte cache lines:
     ulong len  = ((ulong)pe - (ulong)p) / 64;
 
-    // JPC: confirm we have an even number of cache lines. right?
-    // since we're going to divide it in half.
+    // Confirm we have an even number of cache lines,
+    // since we're about to divide the region in half.
     ASSERT(0 == (len & 1));
 
-    if (1) {
-        // TODO(jcoiner):
-        // From a normal functional-analysis perspective,
-        // we only need to initialize len/2, since we're going to
-        // just copy the first half onto the second half in the next
-        // step.
-        //
-        // However, do we actually derive coverage from writing
-        // the 2nd half of the block, and then writing it again?
-        // Is that a difficult operation for memory, to be
-        // rewritten with the same value it contained already? TBD.
-        len = len >> 1;
-    }
+    /*** TODO
 
-#if 0
-    asm __volatile__
-        (
-         "jmp L100\n\t"
+         Fix loop test, which is still tricky with overflow cases,
+         to use dword indices that won't overflow.
 
-         ".p2align 4,,7\n\t"
-         "L100:\n\t"
+         C check routine, and confirm values are as expected.
 
-         // First loop eax is 0x00000001, edx is 0xfffffffe
-         "movl %%eax, %%edx\n\t"
-         "notl %%edx\n\t"
+         Fix ASSERT to print a nicer message.
 
-         // Set a block of 64-bytes	// First loop DWORDS are 
-         "movl %%eax,0(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,4(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,8(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,12(%%edi)\n\t"	// 0x00000001
-         "movl %%edx,16(%%edi)\n\t"	// 0xfffffffe
-         "movl %%edx,20(%%edi)\n\t"	// 0xfffffffe
-         "movl %%eax,24(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,28(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,32(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,36(%%edi)\n\t"	// 0x00000001
-         "movl %%edx,40(%%edi)\n\t"	// 0xfffffffe
-         "movl %%edx,44(%%edi)\n\t"	// 0xfffffffe
-         "movl %%eax,48(%%edi)\n\t"	// 0x00000001
-         "movl %%eax,52(%%edi)\n\t"	// 0x00000001
-         "movl %%edx,56(%%edi)\n\t"	// 0xfffffffe
-         "movl %%edx,60(%%edi)\n\t"	// 0xfffffffe
+         Fix test 2 (track down ubuntu's source?)
+     ***/
+    
+    // We only need to initialize len/2, since we'll just copy
+    // the first half onto the second half in the move step.
+    len = len >> 1;
 
-         // rotate left with carry, 
-         // second loop eax is		 0x00000002
-         // second loop edx is (~eax) 0xfffffffd
-         "rcll $1, %%eax\n\t"		
-
-         // Move current position forward 64-bytes (to start of next block)
-         "leal 64(%%edi), %%edi\n\t"
-
-         // Loop until end
-         "decl %%ecx\n\t"
-         "jnz  L100\n\t"
-
-         /*   output */ : "=D" (p)
-         /*    input */ : "D" (p), "c" (len), "a" (1)
-         /* clobbers */ : "edx"
-         );
-#else
-    // Saw test 7 fail, with this code in place,
-    // at 2133, a couple times in a row. But now it won't!
-    // (Keep in mind:
-    //  once we run with the assembly init, we've initted
-    //  a lot of memory. Does the VM clear it on a VM
-    //  restart? You would think right? But then, cleared
-    //  memory is likely to pass the test, hrmm)
-
-    ulong base_val = 1; // eax is assembly
+    ulong base_val = 1;
     while(len > 0) {
         ulong neg_val = ~base_val;
 
@@ -1378,7 +1325,6 @@ void block_move_init(ulong* p, ulong* pe, int iter, int me) {
             base_val = base_val << 1;
         }
     }
-#endif
 }
 
 void block_move_move(ulong* p, ulong* pe, int iter, int me) {
@@ -1397,50 +1343,6 @@ void block_move_move(ulong* p, ulong* pe, int iter, int me) {
         }
         { BAILR }
 
-        // Q) Why errors in VM at 2133?
-        // A) Not this -- it still fails with orig asm.
-#if 1
-        asm __volatile__
-            (
-             "cld\n"
-             "jmp L110\n\t"
-
-             ".p2align 4,,7\n\t"
-             "L110:\n\t"
-
-             //
-             // At the end of all this 
-             // - the second half equals the inital value of the first half
-             // - the first half is right shifted 32-bytes (with wrapping)
-             //
-
-             // Move first half to second half
-             "movl %1,%%edi\n\t" // Destination, pp (mid point)
-             "movl %0,%%esi\n\t" // Source, p (start point)
-             "movl %2,%%ecx\n\t" // Length, len (size of a half in DWORDS)
-             "rep\n\t"
-             "movsl\n\t"
-
-             // Move the second half, less the last 32-bytes. To the first half, offset plus 32-bytes
-             "movl %0,%%edi\n\t"
-             "addl $32,%%edi\n\t" // Destination, p(start-point) plus 32 bytes
-             "movl %1,%%esi\n\t"  // Source, pp(mid-point)
-             "movl %2,%%ecx\n\t"
-             "subl $8,%%ecx\n\t"  // Length, len(size of a half in DWORDS) minus 8 DWORDS (32 bytes)
-             "rep\n\t"
-             "movsl\n\t"
-
-             // Move last 8 DWORDS (32-bytes) of the second half to the start of the first half
-             "movl %0,%%edi\n\t"  // Destination, p(start-point)
-             // Source, 8 DWORDS from the end of the second half, left over by the last rep/movsl
-             "movl $8,%%ecx\n\t"  // Length, 8 DWORDS (32-bytes)
-             "rep\n\t"
-             "movsl\n\t"
-
-             :: "g" (p), "g" (pp), "g" (len)
-             : "edi", "esi", "ecx"
-             );
-#else
         // p == block start
         // pp == midpoint
         // pe == block end
@@ -1462,7 +1364,6 @@ void block_move_move(ulong* p, ulong* pe, int iter, int me) {
         movsl(pp + len - 8,
               p,
               8);
-#endif
     }
 }
 
