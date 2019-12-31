@@ -106,11 +106,11 @@ typedef unsigned long ulong;
 
 #define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
 
-int memcmp(const void *s1, const void *s2, ulong count);
-void *memmove(void *dest, const void *src, ulong n);
-int strncmp(const char *s1, const char *s2, ulong n);
-int strstr(char *str1, char *str2);
-int strlen(char *string);
+int mt86_memcmp(const void *s1, const void *s2, ulong count);
+void *mt86_memmove(void *dest, const void *src, ulong n);
+int mt86_strncmp(const char *s1, const char *s2, ulong n);
+int mt86_strstr(char *str1, char *str2);
+int mt86_strlen(char *string);
 int query_linuxbios(void);
 int query_pcbios(void);
 int insertaddress(ulong);
@@ -183,7 +183,7 @@ void show_spd(void);
 int map_page(unsigned long page);
 void *mapping(unsigned long phys_page);   // get VA for a physical page
 void *emapping(unsigned long phys_page);
-int isdigit(char c);
+int mt86_isdigit(char c);
 ulong memspeed(ulong src, ulong len, int iter);
 unsigned long page_of(void *ptr);
 ulong correct_tsc(ulong el_org);

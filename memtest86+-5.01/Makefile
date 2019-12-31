@@ -15,11 +15,15 @@ CC=gcc
 CFLAGS= -Wall -Werror -march=i486 -m32 -O1 -fomit-frame-pointer -fno-builtin \
 	-ffreestanding -fPIC $(SMP_FL) -fno-stack-protector 
 
+SELF_TEST_CFLAGS = -Wall -Werror -march=i486 -m32 -O1
+
 OBJS= head.o reloc.o main.o test.o init.o lib.o patn.o screen_buffer.o \
       config.o cpuid.o linuxbios.o pci.o memsize.o spd.o error.o dmi.o controller.o \
       smp.o vmem.o random.o
 
-all: clean memtest.bin memtest
+SELF_TEST_OBJS = test.o self_test.o cpuid.o random.o
+
+all: clean memtest.bin memtest self_test
 
 # Link it statically once so I know I don't have undefined
 # symbols and then link it dynamically so I have full
@@ -34,6 +38,9 @@ memtest_shared.bin: memtest_shared
 
 memtest: memtest_shared.bin memtest.lds
 	$(LD) -s -T memtest.lds -b binary memtest_shared.bin -o $@
+
+self_test : $(SELF_TEST_OBJS)
+	$(CC) $(SELF_TEST_CFLAGS) -o $@ $(SELF_TEST_OBJS)
 
 head.s: head.S config.h defs.h test.h
 	$(CC) -E -traditional $< -o $@
@@ -51,8 +58,12 @@ memtest.bin: memtest_shared.bin bootsect.o setup.o memtest.bin.lds
 reloc.o: reloc.c
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing reloc.c
 
+# JPC BOZO: try -O1 here once the bugs are fixed.
 test.o: test.c
 	$(CC) -c -Wall -march=i486 -m32 -O0 -fomit-frame-pointer -fno-builtin -ffreestanding test.c
+
+self_test.o : self_test.c
+	$(CC) -c $(SELF_TEST_CFLAGS) self_test.c
 
 random.o: random.c
 	$(CC) -c -Wall -march=i486 -m32 -O3 -fomit-frame-pointer -fno-builtin -ffreestanding random.c

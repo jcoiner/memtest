@@ -368,7 +368,6 @@ void movinvr(int me)
     ulong *pe;
     ulong *start,*end;
     ulong xorVal;
-    //ulong num, bad;
 
     /* Initialize memory with initial sequence of random numbers.  */
     if (cpu_id.fid.bits.rdtsc) {
@@ -553,7 +552,7 @@ void movinvr(int me)
 
 /*
  * Test all of memory using a "moving inversions" algorithm using the
- * pattern in p1 and it's complement in p2.
+ * pattern in p1 and its complement in p2.
  */
 void movinv1 (int iter, ulong p1, ulong p2, int me)
 {
@@ -695,7 +694,7 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
                 }
 
                 /* Since we are using unsigned addresses a 
-                 * redundent check is required */
+                 * redundant check is required */
                 if (pe < start || pe > end) {
                     pe = start;
                     done++;

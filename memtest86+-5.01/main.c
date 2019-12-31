@@ -207,7 +207,7 @@ static void run_at(unsigned long addr, int cpu)
 
     /* CPU 0, Copy memtest86+ code */
     if (cpu == 0) {
-        memmove((void *)addr, &_start, _end - _start);
+        mt86_memmove((void *)addr, &_start, _end - _start);
     }
 
     /* Wait for the copy */
@@ -298,27 +298,27 @@ static void parse_command_line(void)
         cp++;
 
     while (*cp) {
-        if (!strncmp(cp, "console=", 8)) {
+        if (!mt86_strncmp(cp, "console=", 8)) {
             cp += 8;
             serial_console_setup(cp);
         }
         /* Enable boot trace? */
-        if (!strncmp(cp, "btrace", 6)) {
+        if (!mt86_strncmp(cp, "btrace", 6)) {
             cp += 6;
             btflag++;
         }
         /* Limit number of CPUs */
-        if (!strncmp(cp, "maxcpus=", 8)) {
+        if (!mt86_strncmp(cp, "maxcpus=", 8)) {
             cp += 8;
             maxcpus=(int)simple_strtoul(cp, &dummy, 10);
         }
         /* Run one pass and exit if there are no errors */
-        if (!strncmp(cp, "onepass", 7)) {
+        if (!mt86_strncmp(cp, "onepass", 7)) {
             cp += 7;
             onepass++;
         }
         /* Setup a list of tests to run */
-        if (!strncmp(cp, "tstlist=", 8)) {
+        if (!mt86_strncmp(cp, "tstlist=", 8)) {
             cp += 8;
             /* Clear all of the tests first */
             k = 0;
@@ -329,11 +329,11 @@ static void parse_command_line(void)
 
             /* Now enable all of the tests in the list */
             j = 0;
-            while(*cp && isdigit(*cp)) {
+            while(*cp && mt86_isdigit(*cp)) {
                 i = *cp-'0';
                 j = j*10 + i;
                 cp++;
-                if (*cp == ',' || !isdigit(*cp)) {
+                if (*cp == ',' || !mt86_isdigit(*cp)) {
                     if (j < k) {
                         tseq[j].sel = 1;
                     }
@@ -344,11 +344,11 @@ static void parse_command_line(void)
             }
         }
         /* Set a CPU mask to select CPU's to use for testing */
-        if (!strncmp(cp, "cpumask=", 8)) {
+        if (!mt86_strncmp(cp, "cpumask=", 8)) {
             cp += 8;
             if (cp[0] == '0' && toupper(cp[1]) == 'X') cp += 2;
             while (*cp && *cp != ' ' && isxdigit(*cp)) {
-                i = isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10; 
+                i = mt86_isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10; 
                 bin_mask = bin_mask * 16 + i;
                 cp++;
             }

@@ -87,8 +87,8 @@ static void sort_pmap(void)
 		if (i != j) {
 			struct pmap temp;
 			temp = vv->pmap[i];
-			memmove(&vv->pmap[j], &vv->pmap[j+1], 
-				(i -j)* sizeof(temp));
+			mt86_memmove(&vv->pmap[j], &vv->pmap[j+1], 
+                                     (i -j)* sizeof(temp));
 			vv->pmap[j] = temp;
 		}
 	}

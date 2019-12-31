@@ -256,11 +256,11 @@ void print_dmi_startup_info(void)
 	if(!dmi_initialized) { init_dmi(); }
 		
 	string1 = get_tstruct_string(&dmi_system_info->header,dmi_system_info->manufacturer);
-	sl1 = strlen(string1);
+	sl1 = mt86_strlen(string1);
 	string2 = get_tstruct_string(&dmi_system_info->header,dmi_system_info->productname);	
-	sl2 = strlen(string2);
+	sl2 = mt86_strlen(string2);
 	string3 = get_tstruct_string(&dmi_cpu_info->header,dmi_cpu_info->cpu_socket);
-	sl3 = strlen(string3);
+	sl3 = mt86_strlen(string3);
 
 	slenght = sl1 + sl2;
 	if(sl3 > 2) { slenght += sl3 + 4; } else { slenght++; }
@@ -419,11 +419,11 @@ void print_dmi_err(void){
 			of+=2;
 		}
 		string=get_tstruct_string((struct tstruct_header *)md,md->dev_locator);
-		if (strlen(string) + of > 80){
+		if (mt86_strlen(string) + of > 80){
 			scroll();
 			of=7;
 		}
 		cprint(vv->msg_line, of, string);
-		of += strlen(string);
+		of += mt86_strlen(string);
 	}
 }

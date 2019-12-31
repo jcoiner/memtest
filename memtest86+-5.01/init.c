@@ -262,7 +262,7 @@ void init(void)
 	
     /* setup beep mode */
     beepmode = BEEP_MODE;
-	
+
     /* Get the cpu and cache information */
     get_cpuid();
 
@@ -631,8 +631,8 @@ void smp_default_mode(void)
   
   for(i = 0; i < 3; i++) 
   {
-  	result = strstr(cpupsn , disabledcpu[i]);
-  	if(result != -1) { vv->fail_safe |= 0b10; }
+      result = mt86_strstr(cpupsn , disabledcpu[i]);
+      if(result != -1) { vv->fail_safe |= 0b10; }
   }
   
   // For 5.01 release, SMP disabled by defualt by config.h toggle

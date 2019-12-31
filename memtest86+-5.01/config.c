@@ -132,7 +132,7 @@ void get_config()
 					 * list */
 					i = j = m = 0;
 					while (1) {
-					    if (isdigit(cp[i])) {
+					    if (mt86_isdigit(cp[i])) {
 						n = cp[i]-'0';
 						j = j*10 + n;
 						i++;

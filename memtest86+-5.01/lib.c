@@ -48,13 +48,13 @@ void reboot(void)
     }
 }
 
-int strlen(char * string){
+int mt86_strlen(char * string){
     int i=0;
     while(*string++){i++;};
     return i;
 }
 
-int strstr(char *haystack, char * needle)
+int mt86_strstr(char *haystack, char * needle)
 {
     int i=0,j=0;
     int here=0;
@@ -64,11 +64,11 @@ int strstr(char *haystack, char * needle)
             if(here==0)
                 here=j;
             i++;j++;
-            if(i>=strlen(needle))
+            if(i>=mt86_strlen(needle))
             {
                 return here;
             }
-            if(j>=strlen(haystack))
+            if(j>=mt86_strlen(haystack))
             {
                 return -1;
             }
@@ -78,7 +78,7 @@ int strstr(char *haystack, char * needle)
     }
 }
 
-int memcmp(const void *s1, const void *s2, ulong count)
+int mt86_memcmp(const void *s1, const void *s2, ulong count)
 {
     const unsigned char *src1 = s1, *src2 = s2;
     int i;
@@ -90,7 +90,7 @@ int memcmp(const void *s1, const void *s2, ulong count)
     return 0;
 }
 
-int strncmp(const char *s1, const char *s2, ulong n) {
+int mt86_strncmp(const char *s1, const char *s2, ulong n) {
     signed char res = 0;
     while (n) {
         res = *s1 - *s2;
@@ -104,7 +104,7 @@ int strncmp(const char *s1, const char *s2, ulong n) {
     return res;
 }
 
-void *memmove(void *dest, const void *src, ulong n)
+void *mt86_memmove(void *dest, const void *src, ulong n)
 {
     long i;
     char *d = (char *)dest, *s = (char *)src;
@@ -131,14 +131,14 @@ char toupper(char c)
         return c;
 }
 
-int isdigit(char c)
+int mt86_isdigit(char c)
 {
     return c >= '0' && c <= '9';
 }
 
 int isxdigit(char c)
 {
-    return isdigit(c) || (toupper(c) >= 'A' && toupper(c) <= 'F'); }
+    return mt86_isdigit(c) || (toupper(c) >= 'A' && toupper(c) <= 'F'); }
 
 unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base) {
     unsigned long result = 0, value;
@@ -158,7 +158,7 @@ unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base) {
             cp += 2;
     }
     while (isxdigit(*cp) &&
-           (value = isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10) < base) {
+           (value = mt86_isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10) < base) {
         result = result*base + value;
         cp++;
     }
@@ -1082,7 +1082,7 @@ void serial_console_setup(char *param)
     unsigned long baud_rate;
     unsigned char parity, bits;
 
-    if (strncmp(param, "ttyS", 4))
+    if (mt86_strncmp(param, "ttyS", 4))
         return;   /* not a serial port */
 
     param += 4;
