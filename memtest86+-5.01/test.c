@@ -1204,79 +1204,81 @@ void movsl(ulong* dest,
 
 void block_move_foreach_segment
 (int iter, int me,
- void(*segment_fn)(ulong* p,  // ptr to start of segment
-                   ulong* pe, // ptr to end of segment
+ void(*segment_fn)(ulong* p,   // ptr to start of segment
+                   ulong len_dw, // length of segment in dwords
                    int iter, int me))
 {
     int j, done;
-    ulong *p, *pe, *start, *end;  // VAs
-
+    ulong *start, *end;  // VAs
     ulong* prev_end = 0;
     for (j=0; j<segs; j++) {
         calculate_chunk(&start, &end, me, j, 64);
 
         ASSERT(start < end);
 
-        // end is always xxxxxffc, so increment so that length
-        // calculations are correct
-        // WARNING: This may wrap, and then 'past_end' may be zero.
-        ulong* past_end = end + 1;
-
-        // Surely 'start' and 'end' are at least cache-line-aligned, right?
-        ASSERT(0 == (((ulong)start)    & 0x3f));
-        ASSERT(0 == (((ulong)past_end) & 0x3f));
+        // Confirm 'start' is cache-line aligned, and 'end'
+        // should point to the last dword on a cache line.
+        ASSERT(0    == (((ulong)start) & 0x3f));
+        ASSERT(0x3c == (((ulong)end)   & 0x3f));
 
         // Ensure no overlap among chunks
         ASSERT(prev_end < start);
         prev_end = end;
 
-        pe = start;
-        p = start;
+        // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
+        // To avoid overflow in our loop tests and length calculations,
+        // use dword indices (the '_dw' vars) to avoid overflow.
+        ulong start_dw = ((ulong)start) >> 2;
+        ulong   end_dw = ((ulong)  end) >> 2;
+
+        // end is always xxxxxffc, but increment end_dw to a cache-line-aligned
+        // address beyond the segment for easier boundary calculations.
+        ++end_dw;
+
+        ulong seg_dw     = start_dw;
+        ulong seg_end_dw = start_dw;
 
         done = 0;
         do {
             do_tick(me);
             { BAILR }
 
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = past_end;
-            }
-            if (past_end == 0) {
-                if (pe == 0) { done++; }
-            } else if (pe >= past_end) {
-                pe = past_end;
+            // ensure no overflow on add
+            ASSERT((seg_end_dw + SPINSZ_DWORDS) > seg_end_dw);
+            seg_end_dw += SPINSZ_DWORDS;
+
+            if (seg_end_dw >= end_dw) {
+                seg_end_dw = end_dw;
                 done++;
             }
-            if (p == pe) {
+            if (seg_dw == seg_end_dw) {
                 break;
             }
 
-            segment_fn(p, pe, iter, me);
+            // ensure no overflow on subtract
+            ASSERT(seg_end_dw > seg_dw);
+            ulong seg_len_dw = seg_end_dw - seg_dw;
 
-            p = pe;
+            segment_fn((ulong*)(seg_dw << 2),
+                       seg_len_dw, iter, me);
+
+            seg_dw = seg_end_dw;
         } while (!done);
     }
 }
 
-void block_move_init(ulong* p, ulong* pe, int iter, int me) {
-    // p is the start address, and pe the end address,
-    // for the current segment.
-    //
-    // Thus 'len' is in units of 64-byte cache lines:
-    ulong len  = ((ulong)pe - (ulong)p) / 64;
+void block_move_init(ulong* p, ulong len_dw, int iter, int me) {
+    // p is the start address for the current segment.
+
+    // Compute 'len' in units of 64-byte cache lines:
+    ulong len  = len_dw / 16;
+    ASSERT((len * 16) == len_dw);
 
     // Confirm we have an even number of cache lines,
     // since we're about to divide the region in half.
     ASSERT(0 == (len & 1));
 
     /*** TODO
-
-         Fix loop test, which is still tricky with overflow cases,
-         to use dword indices that won't overflow.
-
          C check routine, and confirm values are as expected.
 
          Fix ASSERT to print a nicer message.
@@ -1327,13 +1329,14 @@ void block_move_init(ulong* p, ulong* pe, int iter, int me) {
     }
 }
 
-void block_move_move(ulong* p, ulong* pe, int iter, int me) {
+void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
     /* Now move the data around 
      * First move the data up half of the segment size we are testing
      * Then move the data to the original location + 32 bytes
      */
-    ulong len  = ((ulong)pe - (ulong)p) / 8; // Half the size of this block in DWORDS
-    ulong* pp = p + len;  // VA at mid-point of this block.
+
+    ulong half_len_dw = len_dw / 2; // Half the size of this block in DWORDS
+    ulong* pp = p + half_len_dw;    // VA at mid-point of this block.
     for (int i=0; i<iter; i++) {
         if (i > 0) {
             // The block_move_foreach_segment called this
@@ -1346,34 +1349,29 @@ void block_move_move(ulong* p, ulong* pe, int iter, int me) {
         // p == block start
         // pp == midpoint
         // pe == block end
-        // len == half the size of the block, in DWORDs
 
         // Move first half to 2nd half:
-        movsl(pp,  // dest
-              p,   // src
-              len);
+        movsl(/*dest=*/ pp, /*src=*/ p, half_len_dw);
 
-        // Move the second half, less the last 32 bytes (8 dwords) to the first half
-        // plus an offset of 32 bytes (8 dwords).
-        movsl(p + 8,
-              pp,
-              len - 8);
+        // Move the second half, less the last 8 dwords
+        // to the first half plus an offset of 8 dwords.
+        movsl(/*dest=*/ p + 8, /*src=*/ pp, half_len_dw - 8);
 
-        // Finally, move the last 8 dwords of the 2nd half to the first 8 dwords
-        // of the first half.
-        movsl(pp + len - 8,
-              p,
-              8);
+        // Finally, move the last 8 dwords of the 2nd half
+        // to the first 8 dwords of the first half.
+        movsl(/*dest=*/ pp + half_len_dw - 8, /*src=*/ p, 8);
     }
 }
 
-void block_move_check(ulong* p, ulong* pe, int iter, int me) {
+void block_move_check(ulong* p, ulong len_dw, int iter, int me) {
     /* Now check the data 
      * The error checking is rather crude.  We just check that the
      * adjacent words are the same.
      */
 
-    pe-=2;	/* the last dwords to test are pe[0] and pe[1] */
+    // The last dwords to test are pe[0] and pe[1]
+    ulong* pe = p + (len_dw - 2);
+
     asm __volatile__
         (
          "jmp L120\n\t"
