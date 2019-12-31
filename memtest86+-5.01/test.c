@@ -1219,16 +1219,15 @@ void block_move_foreach_segment
 
         // end is always xxxxxffc, so increment so that length
         // calculations are correct
-        // WARNING: This may wrap, and then end may be zero!
-        // BOZO JPC: is that even guaranteed behavior in c?
-        end = end + 1;
+        // WARNING: This may wrap, and then 'past_end' may be zero.
+        ulong* past_end = end + 1;
 
         // Surely 'start' and 'end' are at least cache-line-aligned, right?
-        ASSERT(0 == (((ulong)start) & 0x3f));
-        ASSERT(0 == (((ulong)end)   & 0x3f));
+        ASSERT(0 == (((ulong)start)    & 0x3f));
+        ASSERT(0 == (((ulong)past_end) & 0x3f));
 
         // Ensure no overlap among chunks
-        ASSERT(prev_end <= start);
+        ASSERT(prev_end < start);
         prev_end = end;
 
         pe = start;
@@ -1243,13 +1242,12 @@ void block_move_foreach_segment
             if (pe + SPINSZ_DWORDS > pe && pe != 0) {
                 pe += SPINSZ_DWORDS;
             } else {
-                pe = end;
+                pe = past_end;
             }
-            // TODO(jcoiner):
-            //  This is a big fat bug! Right? If 'end' wrapped at the +1 above,
-            //  now it's zero and we'll prematurely stop the loop.
-            if (pe >= end) {
-                pe = end;
+            if (past_end == 0) {
+                if (pe == 0) { done++; }
+            } else if (pe >= past_end) {
+                pe = past_end;
                 done++;
             }
             if (p == pe) {
