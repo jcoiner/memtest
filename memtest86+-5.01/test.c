@@ -1218,8 +1218,6 @@ void block_move_foreach_segment
         ASSERT(prev_end < start);
         prev_end = end;
 
-        ASSERT(0); // bozo
-
         // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
         // To avoid overflow in our loop tests and length calculations,
         // use dword indices (the '_dw' vars) to avoid overflow.
