@@ -292,7 +292,8 @@ static void setup_nhm(void)
 
     /* First, locate the PCI bus where the MCH is located */
 
-    for(i = 0; i < 3; i++) {
+    for(i = 0; i < (sizeof(possible_nhm_bus) /
+                    sizeof(possible_nhm_bus[0])); i++) {
         pci_conf_read( possible_nhm_bus[i], 3, 4, 0x00, 2, &vid);
         pci_conf_read( possible_nhm_bus[i], 3, 4, 0x02, 2, &did);
         vid &= 0xFFFF;
@@ -304,7 +305,7 @@ static void setup_nhm(void)
 
     /* Now, we have the last IMC bus number in nhm_bus */
     /* Check for ECC & Scrub */
-	
+
     pci_conf_read(nhm_bus, 3, 0, 0x4C, 2, &mc_control);	
     if((mc_control >> 4) & 1) { 
         ctrl.mode = ECC_CORRECT; 
@@ -327,7 +328,8 @@ static void setup_nhm32(void)
     ctrl.mode = ECC_NONE;
 
     /* First, locate the PCI bus where the MCH is located */
-    for(i = 0; i < 3; i++) {
+    for(i = 0; i < (sizeof(possible_nhm_bus) /
+                    sizeof(possible_nhm_bus[0])); i++) {
         pci_conf_read( possible_nhm_bus[i], 3, 4, 0x00, 2, &vid);
         pci_conf_read( possible_nhm_bus[i], 3, 4, 0x02, 2, &did);
         vid &= 0xFFFF;
