@@ -190,8 +190,8 @@ void addr_tst1(int me)
         /* Set pattern in our lowest multiple of 0x20000 */
         p = (ulong *)roundup((ulong)vv->map[0].start, 0x1ffff);
         *p = p1;
-	
-        /* Now write pattern compliment */
+
+        /* Now write pattern complement */
         p1 = ~p1;
         end = vv->map[segs-1].end;
         for (i=0; i<100; i++) {
@@ -357,7 +357,7 @@ void addr_tst2(int me)
 
 /*
  * Test all of memory using a "half moving inversions" algorithm using random
- * numbers and their complment as the data pattern. Since we are not able to
+ * numbers and their complement as the data pattern. Since we are not able to
  * produce random numbers in reverse order testing is only done in the forward
  * direction.
  */
