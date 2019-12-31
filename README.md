@@ -2,6 +2,13 @@
 
 Fork of memtest86+ 5.01 with improvements on correctness and code readability.
 
+## TODO
+
+ - make the assert print a unique message, in yellow
+   instead of just overloading the regular error() routine
+ - fix test 2. why does it hang? maybe track down ubuntu's sources?
+   get a clean end to end pass.
+
 ## Changes since 5.01
 
  - Add an ASSERT() macro that we can use to detect coding bugs

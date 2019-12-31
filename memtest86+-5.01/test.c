@@ -1168,12 +1168,12 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     }
 }
 
-#define ASSERT(n) do { \
-    if (!(n)) {                \
-        assert_fail(__LINE__); \
+#define ASSERT(n) do {                   \
+    if (!(n)) {                          \
+        assert_fail(__FILE__, __LINE__); \
     } } while(0);
 
-static void assert_fail(int line_no) {
+static void assert_fail(const char* file, int line_no) {
     error((ulong*)0xABADDADD, 0, line_no);
 
     // Ensure the report remains visible for a while...
@@ -1278,14 +1278,6 @@ void block_move_init(ulong* p, ulong len_dw, int iter, int me) {
     // since we're about to divide the region in half.
     ASSERT(0 == (len & 1));
 
-    /*** TODO
-         C check routine, and confirm values are as expected.
-
-         Fix ASSERT to print a nicer message.
-
-         Fix test 2 (track down ubuntu's source?)
-     ***/
-    
     // We only need to initialize len/2, since we'll just copy
     // the first half onto the second half in the move step.
     len = len >> 1;
@@ -1294,31 +1286,30 @@ void block_move_init(ulong* p, ulong len_dw, int iter, int me) {
     while(len > 0) {
         ulong neg_val = ~base_val;
 
-        // Set a block of 64 bytes   //   first word DWORDS are:
+        // Set a block of 64 bytes   //   first block DWORDS are:
         p[0] = base_val;             //   0x00000001
         p[1] = base_val;             //   0x00000001
         p[2] = base_val;             //   0x00000001
         p[3] = base_val;             //   0x00000001
         p[4] = neg_val;              //   0xfffffffe
-        p[5] = neg_val;              //   etc.
-        p[6] = base_val;
-        p[7] = base_val;
-        p[8] = base_val;
-        p[9] = base_val;
-        p[10] = neg_val;
-        p[11] = neg_val;
-        p[12] = base_val;
-        p[13] = base_val;
-        p[14] = neg_val;
-        p[15] = neg_val;
+        p[5] = neg_val;              //   0xfffffffe
+        p[6] = base_val;             //   0x00000001
+        p[7] = base_val;             //   0x00000001
+        p[8] = base_val;             //   0x00000001
+        p[9] = base_val;             //   0x00000001
+        p[10] = neg_val;             //   0xfffffffe
+        p[11] = neg_val;             //   0xfffffffe
+        p[12] = base_val;            //   0x00000001
+        p[13] = base_val;            //   0x00000001
+        p[14] = neg_val;             //   0xfffffffe
+        p[15] = neg_val;             //   0xfffffffe
 
         p += 16;  // advance p to next cache line
         len--;
 
-        // Rotate the bit left, including an all-zero state
-        // (I think that's what the original asm did?)
-        // Is the periodicity of 33 significant, is it important
-        // that this not be a power of 2?
+        // Rotate the bit left, including an all-zero state.
+        // It can't hurt to have a periodicity of 33 instead of
+        // a power of two.
         if (base_val == 0) {
             base_val = 1;
         } else if (base_val & 0x80000000) {
@@ -1365,7 +1356,6 @@ void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
 
 void block_move_check(ulong* p, ulong len_dw, int iter, int me) {
     /* Now check the data.
-     *
      * This is rather crude, we just check that the
      * adjacent words are the same.
      */
