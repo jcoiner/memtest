@@ -1180,6 +1180,28 @@ static void assert_fail(int line_no) {
     sleep(60, 0, 0, 1);
 }
 
+void movsl(ulong* dest,
+           ulong* src,
+           ulong size_in_dwords) {
+    asm __volatile__
+        (
+         "cld\n"
+         "jmp L110\n\t"
+
+         ".p2align 4,,7\n\t"
+         "L110:\n\t"
+
+         "movl %1,%%edi\n\t" // dest
+         "movl %0,%%esi\n\t" // src
+         "movl %2,%%ecx\n\t" // len in dwords
+         "rep\n\t"
+         "movsl\n\t"
+
+         :: "g" (src), "g" (dest), "g" (size_in_dwords)
+         : "edi", "esi", "ecx"
+         );
+}
+
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
@@ -1188,8 +1210,7 @@ void block_move(int iter, int me)
 {
     int i, j, done;
     ulong len;
-    ulong pp;
-    ulong *p, *pe, *start, *end;  // VAs
+    ulong *p, *pe, *start, *end, *pp;  // VAs
 
     cprint(LINE_PAT, COL_PAT-2, "          ");
 
@@ -1383,11 +1404,13 @@ void block_move(int iter, int me)
             if (p == pe ) {
                 break;
             }
-            pp = (ulong)p + (((ulong)pe - (ulong)p) / 2); // Mid-point of this block
             len  = ((ulong)pe - (ulong)p) / 8; // Half the size of this block in DWORDS
+            pp = p + len;  // Mid-point of this block
             for(i=0; i<iter; i++) {
                 do_tick(me);
                 { BAILR }
+
+#if 0
                 asm __volatile__
                     (
                      "cld\n"
@@ -1428,6 +1451,29 @@ void block_move(int iter, int me)
                      :: "g" (p), "g" (pp), "g" (len)
                      : "edi", "esi", "ecx"
                      );
+#else
+                // p == block start
+                // pp == midpoint
+                // pe == block end
+                // len == half the size of the block, in DWORDs
+
+                // Move first half to 2nd half:
+                movsl(pp,  // dest
+                      p,   // src
+                      len);
+
+                // Move the second half, less the last 32 bytes (8 dwords) to the first half
+                // plus an offset of 32 bytes (8 dwords).
+                movsl(p + 8,
+                      pp,
+                      len - 8);
+
+                // Finally, move the last 8 dwords of the 2nd half to the first 8 dwords
+                // of the first half.
+                movsl(pp + len - 8,
+                      p,
+                      8);
+#endif
             }
             p = pe;
         } while (!done);
