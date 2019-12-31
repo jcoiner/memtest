@@ -9,10 +9,10 @@ Fork of memtest86+ 5.01 with improvements on correctness and code readability.
    that's not their intent. Thus the message prints in yellow, not red
    like traditional memory errors.
 
- - Use comments and naming to specify units on major APIs and data
-   structures. The original codebase had a lot of 'ulong' types where
-   you might wonder: is it a byte address? Cache line index? Page index?
-   Offset from somewhere? Nobody knows! This is a work in progress.
+ - Specify units on major APIs, data structures, and magic-number
+   macros. Use comments and naming to clarify whether a given
+   integer represents a physical address, virtual address,
+   cache line index, page index, etc.
 
  - Avoid single-letter variable names. This is a work in progress.
    Favor names that are meaningful, or at least searchable.
@@ -21,15 +21,17 @@ Fork of memtest86+ 5.01 with improvements on correctness and code readability.
    render the same for everyone.
 
  - Rewrite test 7 (block moves) with several improvements:
-   - Avoid duplicating the formerly-tricky loop tests.
+   - Avoid duplicating the loop tests.
    - Simplify the loop tests. Instead of being excruciatingly careful,
-     we can avoid overflows by computing the loop bounds in terms of dword
-     indices (ranging up to 1G) instead of raw pointers (ranging up to
+     avoid overflows by computing loop bounds in terms of dword indices
+     (ranging up to 1G) instead of raw pointers (ranging up to
      4G and the overflow boundary.)
+   - Assert that the results of calculate_chunk() are aligned sanely
+     and consistently with our assumptions.
    - Fix a bug that would cause the test to terminate prematurely when
      the range from calculate_chunk() happens to map to the exact top of the
      4GB address space (which can happen.)
-   - Replace assembly with C for all but the critical 'movsl' instruction
-     that does the heavy lifting for this test. The rewritten test performs
-     within measurement error of the original. It's short and should be
-     easier to inspect and maintain.
+   - Replace assembly with C for everything except the critical
+     'movsl' instruction that does the heavy lifting. The rewritten
+     test performs within measurement error of the original, and
+     should be easier to inspect and maintain.
