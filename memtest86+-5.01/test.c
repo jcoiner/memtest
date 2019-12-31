@@ -1168,19 +1168,21 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     }
 }
 
+#define ASSERT(n) do { \
+    if (!(n)) {                \
+        assert_fail(__LINE__); \
+    } } while(0);
+
+static void assert_fail(int line_no) {
+    error((ulong*)0xABADDADD, 0, line_no);
+
+    // Ensure the report remains visible for a while...
+    sleep(60, 0, 0, 1);
+}
+
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
- */
-
-/* TODO(jcoiner):
- * 
- *  - Figure out how to write an assert
- *    * Answer: call error(), and probably sleep so we can see it
- *      before it scrolls away. Make a function for this.
- *  - Assert that:
- *    * chunks don't overlap
- *    * chunk start and end addresses are page-aligned
  */
 void block_move(int iter, int me)
 {
@@ -1192,12 +1194,31 @@ void block_move(int iter, int me)
     cprint(LINE_PAT, COL_PAT-2, "          ");
 
     /* Initialize memory with the initial pattern.  */
+    ulong* prev_end = 0;
     for (j=0; j<segs; j++) {
         calculate_chunk(&start, &end, me, j, 64);
 
         // end is always xxxxxffc, so increment so that length
         // calculations are correct
         end = end + 1;
+
+        // Both start and end should be page aligned, right?
+#if 0
+        ASSERT(0 == (((ulong)start) & 0xfff));
+        ASSERT(0 == (((ulong)end)   & 0xfff));
+
+#else
+        // OK that didn't work (start is not page-aligned)
+        // but surely they're at least cache-line
+        // aligned, right?
+        ASSERT(0 == (((ulong)start) & 0x3f));
+        ASSERT(0 == (((ulong)end)   & 0x3f));
+#endif
+
+        // Ensure no overlap among chunks
+        ASSERT(prev_end <= start);
+        // Why not...
+        ASSERT(start < end);
 
         pe = start;
         p = start;
@@ -1227,17 +1248,25 @@ void block_move(int iter, int me)
             // which means 'len' is in units of 64-byte cache lines:
             len  = ((ulong)pe - (ulong)p) / 64;
 
-            // TODO(jcoiner):
-            // From a normal functional-analysis perspective,
-            // we only need to initialize len/2, since we're going to
-            // Since we're going to use movsl to copy the first half
-            // onto the second half next.
-            //
-            // However: do we actually derive coverage from writing
-            // the 2nd half of the block, and then writing it again?
-            // Is that a difficult operation for memory, to be
-            // rewritten with the same value it contained already? TBD.
+            // JPC: confirm we have an even number of cache lines. right?
+            // since we're going to divide it in half.
+            ASSERT(0 == (len & 1));
 
+            if (1) {
+                // TODO(jcoiner):
+                // From a normal functional-analysis perspective,
+                // we only need to initialize len/2, since we're going to
+                // just copy the first half onto the second half in the next
+                // step.
+                //
+                // However, do we actually derive coverage from writing
+                // the 2nd half of the block, and then writing it again?
+                // Is that a difficult operation for memory, to be
+                // rewritten with the same value it contained already? TBD.
+                len = len >> 1;
+            }
+
+#if 0
             asm __volatile__
                 (
                  "jmp L100\n\t"
@@ -1283,6 +1312,45 @@ void block_move(int iter, int me)
                  /*    input */ : "D" (p), "c" (len), "a" (1)
                  /* clobbers */ : "edx"
                  );
+#else
+            ulong base_val = 1; // eax is assembly
+            while(len > 0) {
+                ulong neg_val = ~base_val;
+
+                // Set a block of 64 bytes   //   first word DWORDS are:
+                p[0] = base_val;             //   0x00000001
+                p[1] = base_val;             //   0x00000001
+                p[2] = base_val;             //   0x00000001
+                p[3] = base_val;             //   0x00000001
+                p[4] = neg_val;              //   0xfffffffe
+                p[5] = neg_val;              //   etc.
+                p[6] = base_val;
+                p[7] = base_val;
+                p[8] = base_val;
+                p[9] = base_val;
+                p[10] = neg_val;
+                p[11] = neg_val;
+                p[12] = base_val;
+                p[13] = base_val;
+                p[14] = neg_val;
+                p[15] = neg_val;
+
+                p += 16;  // advance p to next cache line
+                len--;
+
+                // Rotate the bit left, including an all-zero state
+                // (I think that's what the original asm did?)
+                // Is the periodicity of 33 significant, is it important
+                // that this not be a power of 2?
+                if (base_val == 0) {
+                    base_val = 1;
+                } else if (base_val & 0x80000000) {
+                    base_val = 0;
+                } else {
+                    base_val = base_val << 1;
+                }
+            }
+#endif
         } while (!done);
     }
     s_barrier();
