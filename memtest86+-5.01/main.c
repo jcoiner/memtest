@@ -886,13 +886,13 @@ int do_test(int my_ord)
         s_barrier();
         movinv1(c_iter,p1,p2,my_ord);
         BAILOUT;
-	
+
         /* Switch patterns */
         s_barrier();
         movinv1(c_iter,p2,p1,my_ord);
         BAILOUT;
         break;
-		
+
     case 5: /* Moving inversions, 8 bit walking ones and zeros (test #5) */
         p0 = 0x80;
         for (i=0; i<8; i++, p0=p0>>1) {

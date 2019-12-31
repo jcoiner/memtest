@@ -28,10 +28,17 @@ void rand_seed( unsigned int seed1, unsigned int seed2, int me);
 ulong rand(int me);
 void poll_errors();
 
+static const void* const nullptr = 0x0;
+
 static inline ulong roundup(ulong value, ulong mask)
 {
     return (value + mask) & ~mask;
 }
+
+#define ASSERT(n) do {                   \
+    if (!(n)) {                          \
+        assert_fail(__FILE__, __LINE__); \
+    } } while(0);
 
 // Writes *start and *end with the VA range to test.
 //
@@ -70,6 +77,100 @@ void calculate_chunk(ulong** start, ulong** end, int me,
             *end = (ulong*)((ulong)(*start) + chunk);
             (*end)--;
         }
+    }
+}
+
+typedef void(*segment_fn)(ulong* start,  // start address
+                          ulong len_dw,  // length of segment in dwords
+                          const void* ctx);  // any context data needed
+
+/* Call segment_fn() for each up-to-SPINSZ segment between
+ * 'start' and 'end'.
+ */
+void foreach_segment
+(ulong* start, ulong* end,
+ int me, const void* ctx, segment_fn func) {
+
+    ASSERT(start < end);
+
+    // Confirm 'start' is cache-line aligned, and 'end'
+    // should point to the last dword on a cache line.
+    ASSERT(0    == (((ulong)start) & 0x3f));
+    ASSERT(0x3c == (((ulong)end)   & 0x3f));
+
+    // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
+    // To avoid overflow in our loop tests and length calculations,
+    // use dword indices (the '_dw' vars) to avoid overflow.
+    ulong start_dw = ((ulong)start) >> 2;
+    ulong   end_dw = ((ulong)  end) >> 2;
+
+    // end is always xxxxxffc, but increment end_dw to a cache-line-aligned
+    // address beyond the segment for easier boundary calculations.
+    ++end_dw;
+
+    ulong seg_dw     = start_dw;
+    ulong seg_end_dw = start_dw;
+
+    int done = 0;
+    do {
+        do_tick(me);
+        { BAILR }
+
+        // ensure no overflow on add
+        ASSERT((seg_end_dw + SPINSZ_DWORDS) > seg_end_dw);
+        seg_end_dw += SPINSZ_DWORDS;
+
+        if (seg_end_dw >= end_dw) {
+            seg_end_dw = end_dw;
+            done++;
+        }
+        if (seg_dw == seg_end_dw) {
+            break;
+        }
+
+        // ensure no overflow on subtract
+        ASSERT(seg_end_dw > seg_dw);
+        ulong seg_len_dw = seg_end_dw - seg_dw;
+
+        func((ulong*)(seg_dw << 2), seg_len_dw, ctx);
+
+        seg_dw = seg_end_dw;
+    } while (!done);
+}
+
+/* Calls segment_fn() for each segment in vv->map.
+ *
+ * Does not slice by CPU number, so it covers the entire memory.
+ * Contrast to sliced_foreach_segment().
+ */
+void unsliced_foreach_segment
+(const void* ctx, int me, segment_fn func) {
+    int j;
+    for (j=0; j<segs; j++) {
+        foreach_segment(vv->map[j].start,
+                        vv->map[j].end,
+                        me, ctx, func);
+    }
+}
+
+/* Calls segment_fn() for each segment to be tested by CPU 'me'.
+ *
+ * In multicore mode, slices the segments by 'me' (the CPU ordinal
+ * number) so that each call will cover only 1/Nth of memory.
+ */
+void sliced_foreach_segment
+(const void *ctx, int me, segment_fn func) {
+    int j;
+    ulong *start, *end;  // VAs
+    ulong* prev_end = 0;
+    for (j=0; j<segs; j++) {
+        calculate_chunk(&start, &end, me, j, 64);
+
+        // Ensure no overlap among chunks
+        ASSERT(prev_end < start);
+        prev_end = end;
+
+        foreach_segment(start, end, me, ctx, func);
     }
 }
 
@@ -174,123 +275,84 @@ void addr_tst1(int me)
     }
 }
 
+void addr_tst2_init_segment(ulong* p,
+                            ulong len_dw,
+                            const void* unused) {
+    ulong* pe = p + (len_dw - 1);
+
+    /* Original C code replaced with hand tuned assembly code
+     *			for (; p <= pe; p++) {
+     *				*p = (ulong)p;
+     *			}
+     */
+    asm __volatile__ (
+                      "jmp L91\n\t"
+                      ".p2align 4,,7\n\t"
+                      "L90:\n\t"
+                      "addl $4,%%edi\n\t"
+                      "L91:\n\t"
+                      "movl %%edi,(%%edi)\n\t"
+                      "cmpl %%edx,%%edi\n\t"
+                      "jb L90\n\t"
+                      : : "D" (p), "d" (pe)
+                      );
+}
+
+void addr_tst2_check_segment(ulong* p,
+                             ulong len_dw,
+                             const void* unused) {
+    ulong* pe = p + (len_dw - 1);
+
+    /* Original C code replaced with hand tuned assembly code
+     *			for (; p <= pe; p++) {
+     *				if((bad = *p) != (ulong)p) {
+     *					ad_err2((ulong)p, bad);
+     *				}
+     *			}
+     */
+    asm __volatile__
+        (
+         "jmp L95\n\t"
+         ".p2align 4,,7\n\t"
+         "L99:\n\t"
+         "addl $4,%%edi\n\t"
+         "L95:\n\t"
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl %%edi,%%ecx\n\t"
+         "jne L97\n\t"
+         "L96:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L99\n\t"
+         "jmp L98\n\t"
+
+         "L97:\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%edi\n\t"
+         "call ad_err2\n\t"
+         "popl %%edi\n\t"
+         "popl %%ecx\n\t"
+         "popl %%edx\n\t"
+         "jmp L96\n\t"
+
+         "L98:\n\t"
+         : : "D" (p), "d" (pe)
+         : "ecx"
+         );
+}
+
 /*
  * Memory address test, own address
  */
 void addr_tst2(int me)
 {
-    int j, done;
-    ulong *p, *pe, *end, *start;
-
     cprint(LINE_PAT, COL_PAT, "address ");
 
-    /* Write each address with it's own address */
-    for (j=0; j<segs; j++) {
-        start = vv->map[j].start;
-        end = vv->map[j].end;
-        pe = (ulong *)start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-            
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-
-            /* Original C code replaced with hand tuned assembly code
-             *			for (; p <= pe; p++) {
-             *				*p = (ulong)p;
-             *			}
-             */
-            asm __volatile__ (
-                              "jmp L91\n\t"
-                              ".p2align 4,,7\n\t"
-                              "L90:\n\t"
-                              "addl $4,%%edi\n\t"
-                              "L91:\n\t"
-                              "movl %%edi,(%%edi)\n\t"
-                              "cmpl %%edx,%%edi\n\t"
-                              "jb L90\n\t"
-                              : : "D" (p), "d" (pe)
-                              );
-            p = pe + 1;
-        } while (!done);
-    }
+    /* Write each address with its own address */
+    unsliced_foreach_segment(nullptr, me, addr_tst2_init_segment);
 
     /* Each address should have its own address */
-    for (j=0; j<segs; j++) {
-        start = vv->map[j].start;
-        end = vv->map[j].end;
-        pe = (ulong *)start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            /* Original C code replaced with hand tuned assembly code
-             *			for (; p <= pe; p++) {
-             *				if((bad = *p) != (ulong)p) {
-             *					ad_err2((ulong)p, bad);
-             *				}
-             *			}
-             */
-            asm __volatile__ (
-                              "jmp L95\n\t"
-                              ".p2align 4,,7\n\t"
-                              "L99:\n\t"
-                              "addl $4,%%edi\n\t"
-                              "L95:\n\t"
-                              "movl (%%edi),%%ecx\n\t"
-                              "cmpl %%edi,%%ecx\n\t"
-                              "jne L97\n\t"
-                              "L96:\n\t"
-                              "cmpl %%edx,%%edi\n\t"
-                              "jb L99\n\t"
-                              "jmp L98\n\t"
-			
-                              "L97:\n\t"
-                              "pushl %%edx\n\t"
-                              "pushl %%ecx\n\t"
-                              "pushl %%edi\n\t"
-                              "call ad_err2\n\t"
-                              "popl %%edi\n\t"
-                              "popl %%ecx\n\t"
-                              "popl %%edx\n\t"
-                              "jmp L96\n\t"
-
-                              "L98:\n\t"
-                              : : "D" (p), "d" (pe)
-                              : "ecx"
-                              );
-            p = pe + 1;
-        } while (!done);
-    }
+    unsliced_foreach_segment(nullptr, me, addr_tst2_check_segment);
 }
 
 /*
@@ -1168,11 +1230,6 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     }
 }
 
-#define ASSERT(n) do {                   \
-    if (!(n)) {                          \
-        assert_fail(__FILE__, __LINE__); \
-    } } while(0);
-
 void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
@@ -1195,72 +1252,7 @@ void movsl(ulong* dest,
          );
 }
 
-void block_move_foreach_segment
-(int iter, int me,
- void(*segment_fn)(ulong* p,   // ptr to start of segment
-                   ulong len_dw, // length of segment in dwords
-                   int iter, int me))
-{
-    int j, done;
-    ulong *start, *end;  // VAs
-    ulong* prev_end = 0;
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 64);
-
-        ASSERT(start < end);
-
-        // Confirm 'start' is cache-line aligned, and 'end'
-        // should point to the last dword on a cache line.
-        ASSERT(0    == (((ulong)start) & 0x3f));
-        ASSERT(0x3c == (((ulong)end)   & 0x3f));
-
-        // Ensure no overlap among chunks
-        ASSERT(prev_end < start);
-        prev_end = end;
-
-        // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
-        // To avoid overflow in our loop tests and length calculations,
-        // use dword indices (the '_dw' vars) to avoid overflow.
-        ulong start_dw = ((ulong)start) >> 2;
-        ulong   end_dw = ((ulong)  end) >> 2;
-
-        // end is always xxxxxffc, but increment end_dw to a cache-line-aligned
-        // address beyond the segment for easier boundary calculations.
-        ++end_dw;
-
-        ulong seg_dw     = start_dw;
-        ulong seg_end_dw = start_dw;
-
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            // ensure no overflow on add
-            ASSERT((seg_end_dw + SPINSZ_DWORDS) > seg_end_dw);
-            seg_end_dw += SPINSZ_DWORDS;
-
-            if (seg_end_dw >= end_dw) {
-                seg_end_dw = end_dw;
-                done++;
-            }
-            if (seg_dw == seg_end_dw) {
-                break;
-            }
-
-            // ensure no overflow on subtract
-            ASSERT(seg_end_dw > seg_dw);
-            ulong seg_len_dw = seg_end_dw - seg_dw;
-
-            segment_fn((ulong*)(seg_dw << 2),
-                       seg_len_dw, iter, me);
-
-            seg_dw = seg_end_dw;
-        } while (!done);
-    }
-}
-
-void block_move_init(ulong* p, ulong len_dw, int iter, int me) {
+void block_move_init(ulong* p, ulong len_dw, const void* unused_ctx) {
     // p is the start address for the current segment.
 
     // Compute 'len' in units of 64-byte cache lines:
@@ -1313,7 +1305,14 @@ void block_move_init(ulong* p, ulong len_dw, int iter, int me) {
     }
 }
 
-void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
+typedef struct {
+    int iter;
+    int me;
+} block_move_ctx;
+
+void block_move_move(ulong* p, ulong len_dw, const void* vctx) {
+    const block_move_ctx* ctx = (const block_move_ctx*)vctx;
+
     /* Now move the data around 
      * First move the data up half of the segment size we are testing
      * Then move the data to the original location + 32 bytes
@@ -1321,12 +1320,11 @@ void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
 
     ulong half_len_dw = len_dw / 2; // Half the size of this block in DWORDS
     ulong* pp = p + half_len_dw;    // VA at mid-point of this block.
-    for (int i=0; i<iter; i++) {
+    for (int i=0; i<ctx->iter; i++) {
         if (i > 0) {
-            // The block_move_foreach_segment called this
-            // before the 0th iteration, so don't tick twice in
-            // quick succession.
-            do_tick(me);
+            // foreach_segment() called this before the 0th iteration,
+            // so don't tick twice in quick succession.
+            do_tick(ctx->me);
         }
         { BAILR }
 
@@ -1347,7 +1345,7 @@ void block_move_move(ulong* p, ulong len_dw, int iter, int me) {
     }
 }
 
-void block_move_check(ulong* p, ulong len_dw, int iter, int me) {
+void block_move_check(ulong* p, ulong len_dw, const void* unused_ctx) {
     /* Now check the data.
      * This is rather crude, we just check that the
      * adjacent words are the same.
@@ -1367,16 +1365,20 @@ void block_move(int iter, int me)
 {
     cprint(LINE_PAT, COL_PAT-2, "          ");
 
+    block_move_ctx ctx;
+    ctx.iter = iter;
+    ctx.me = me;
+    
     /* Initialize memory with the initial pattern.  */
-    block_move_foreach_segment(iter, me, block_move_init);
+    sliced_foreach_segment(&ctx, me, block_move_init);
     s_barrier();
 
     /* Now move the data around */
-    block_move_foreach_segment(iter, me, block_move_move);    
+    sliced_foreach_segment(&ctx, me, block_move_move);
     s_barrier();
 
     /* And check it. */
-    block_move_foreach_segment(iter, me, block_move_check);
+    sliced_foreach_segment(&ctx, me, block_move_check);
 }
 
 /*
