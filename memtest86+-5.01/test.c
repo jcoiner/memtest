@@ -1186,10 +1186,10 @@ void movsl(ulong* dest,
     asm __volatile__
         (
          "cld\n"
-         "jmp L110\n\t"
+         "jmp L1189\n\t"
 
          ".p2align 4,,7\n\t"
-         "L110:\n\t"
+         "L1189:\n\t"
 
          "movl %1,%%edi\n\t" // dest
          "movl %0,%%esi\n\t" // src
@@ -1202,353 +1202,336 @@ void movsl(ulong* dest,
          );
 }
 
+void block_move_foreach_segment
+(int iter, int me,
+ void(*segment_fn)(ulong* p,  // ptr to start of segment
+                   ulong* pe, // ptr to end of segment
+                   int iter, int me))
+{
+    int j, done;
+    ulong *p, *pe, *start, *end;  // VAs
+
+    ulong* prev_end = 0;
+    for (j=0; j<segs; j++) {
+        calculate_chunk(&start, &end, me, j, 64);
+
+        ASSERT(start < end);
+
+        // end is always xxxxxffc, so increment so that length
+        // calculations are correct
+        // WARNING: This may wrap, and then end may be zero!
+        // BOZO JPC: is that even guaranteed behavior in c?
+        end = end + 1;
+
+        // Surely 'start' and 'end' are at least cache-line-aligned, right?
+        ASSERT(0 == (((ulong)start) & 0x3f));
+        ASSERT(0 == (((ulong)end)   & 0x3f));
+
+        // Ensure no overlap among chunks
+        ASSERT(prev_end <= start);
+        prev_end = end;
+
+        pe = start;
+        p = start;
+
+        done = 0;
+        do {
+            do_tick(me);
+            { BAILR }
+
+            /* Check for overflow */
+            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
+                pe += SPINSZ_DWORDS;
+            } else {
+                pe = end;
+            }
+            // TODO(jcoiner):
+            //  This is a big fat bug! Right? If 'end' wrapped at the +1 above,
+            //  now it's zero and we'll prematurely stop the loop.
+            if (pe >= end) {
+                pe = end;
+                done++;
+            }
+            if (p == pe) {
+                break;
+            }
+
+            segment_fn(p, pe, iter, me);
+
+            p = pe;
+        } while (!done);
+    }
+}
+
+void block_move_init(ulong* p, ulong* pe, int iter, int me) {
+    // p is the start address, and pe the end address,
+    // for the current loop iteration.
+    //
+    // which means 'len' is in units of 64-byte cache lines:
+    ulong len  = ((ulong)pe - (ulong)p) / 64;
+
+    // JPC: confirm we have an even number of cache lines. right?
+    // since we're going to divide it in half.
+    ASSERT(0 == (len & 1));
+
+    if (1) {
+        // TODO(jcoiner):
+        // From a normal functional-analysis perspective,
+        // we only need to initialize len/2, since we're going to
+        // just copy the first half onto the second half in the next
+        // step.
+        //
+        // However, do we actually derive coverage from writing
+        // the 2nd half of the block, and then writing it again?
+        // Is that a difficult operation for memory, to be
+        // rewritten with the same value it contained already? TBD.
+        len = len >> 1;
+    }
+
+#if 0
+    asm __volatile__
+        (
+         "jmp L100\n\t"
+
+         ".p2align 4,,7\n\t"
+         "L100:\n\t"
+
+         // First loop eax is 0x00000001, edx is 0xfffffffe
+         "movl %%eax, %%edx\n\t"
+         "notl %%edx\n\t"
+
+         // Set a block of 64-bytes	// First loop DWORDS are 
+         "movl %%eax,0(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,4(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,8(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,12(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,16(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,20(%%edi)\n\t"	// 0xfffffffe
+         "movl %%eax,24(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,28(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,32(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,36(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,40(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,44(%%edi)\n\t"	// 0xfffffffe
+         "movl %%eax,48(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,52(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,56(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,60(%%edi)\n\t"	// 0xfffffffe
+
+         // rotate left with carry, 
+         // second loop eax is		 0x00000002
+         // second loop edx is (~eax) 0xfffffffd
+         "rcll $1, %%eax\n\t"		
+
+         // Move current position forward 64-bytes (to start of next block)
+         "leal 64(%%edi), %%edi\n\t"
+
+         // Loop until end
+         "decl %%ecx\n\t"
+         "jnz  L100\n\t"
+
+         /*   output */ : "=D" (p)
+         /*    input */ : "D" (p), "c" (len), "a" (1)
+         /* clobbers */ : "edx"
+         );
+#else
+    // Saw test 7 fail, with this code in place,
+    // at 2133, a couple times in a row. But now it won't!
+    // (Keep in mind:
+    //  once we run with the assembly init, we've initted
+    //  a lot of memory. Does the VM clear it on a VM
+    //  restart? You would think right? But then, cleared
+    //  memory is likely to pass the test, hrmm)
+
+    ulong base_val = 1; // eax is assembly
+    while(len > 0) {
+        ulong neg_val = ~base_val;
+
+        // Set a block of 64 bytes   //   first word DWORDS are:
+        p[0] = base_val;             //   0x00000001
+        p[1] = base_val;             //   0x00000001
+        p[2] = base_val;             //   0x00000001
+        p[3] = base_val;             //   0x00000001
+        p[4] = neg_val;              //   0xfffffffe
+        p[5] = neg_val;              //   etc.
+        p[6] = base_val;
+        p[7] = base_val;
+        p[8] = base_val;
+        p[9] = base_val;
+        p[10] = neg_val;
+        p[11] = neg_val;
+        p[12] = base_val;
+        p[13] = base_val;
+        p[14] = neg_val;
+        p[15] = neg_val;
+
+        p += 16;  // advance p to next cache line
+        len--;
+
+        // Rotate the bit left, including an all-zero state
+        // (I think that's what the original asm did?)
+        // Is the periodicity of 33 significant, is it important
+        // that this not be a power of 2?
+        if (base_val == 0) {
+            base_val = 1;
+        } else if (base_val & 0x80000000) {
+            base_val = 0;
+        } else {
+            base_val = base_val << 1;
+        }
+    }
+#endif
+}
+
+void block_move_move(ulong* p, ulong* pe, int iter, int me) {
+    /* Now move the data around 
+     * First move the data up half of the segment size we are testing
+     * Then move the data to the original location + 32 bytes
+     */
+    ulong len  = ((ulong)pe - (ulong)p) / 8; // Half the size of this block in DWORDS
+    ulong* pp = p + len;  // VA at mid-point of this block.
+    for (int i=0; i<iter; i++) {
+        if (i > 0) {
+            // The block_move_foreach_segment called this
+            // before the 0th iteration, so don't tick twice in
+            // quick succession.
+            do_tick(me);
+        }
+        { BAILR }
+
+        // Q) Why errors in VM at 2133?
+        // A) Not this -- it still fails with orig asm.
+#if 1
+        asm __volatile__
+            (
+             "cld\n"
+             "jmp L110\n\t"
+
+             ".p2align 4,,7\n\t"
+             "L110:\n\t"
+
+             //
+             // At the end of all this 
+             // - the second half equals the inital value of the first half
+             // - the first half is right shifted 32-bytes (with wrapping)
+             //
+
+             // Move first half to second half
+             "movl %1,%%edi\n\t" // Destination, pp (mid point)
+             "movl %0,%%esi\n\t" // Source, p (start point)
+             "movl %2,%%ecx\n\t" // Length, len (size of a half in DWORDS)
+             "rep\n\t"
+             "movsl\n\t"
+
+             // Move the second half, less the last 32-bytes. To the first half, offset plus 32-bytes
+             "movl %0,%%edi\n\t"
+             "addl $32,%%edi\n\t" // Destination, p(start-point) plus 32 bytes
+             "movl %1,%%esi\n\t"  // Source, pp(mid-point)
+             "movl %2,%%ecx\n\t"
+             "subl $8,%%ecx\n\t"  // Length, len(size of a half in DWORDS) minus 8 DWORDS (32 bytes)
+             "rep\n\t"
+             "movsl\n\t"
+
+             // Move last 8 DWORDS (32-bytes) of the second half to the start of the first half
+             "movl %0,%%edi\n\t"  // Destination, p(start-point)
+             // Source, 8 DWORDS from the end of the second half, left over by the last rep/movsl
+             "movl $8,%%ecx\n\t"  // Length, 8 DWORDS (32-bytes)
+             "rep\n\t"
+             "movsl\n\t"
+
+             :: "g" (p), "g" (pp), "g" (len)
+             : "edi", "esi", "ecx"
+             );
+#else
+        // p == block start
+        // pp == midpoint
+        // pe == block end
+        // len == half the size of the block, in DWORDs
+
+        // Move first half to 2nd half:
+        movsl(pp,  // dest
+              p,   // src
+              len);
+
+        // Move the second half, less the last 32 bytes (8 dwords) to the first half
+        // plus an offset of 32 bytes (8 dwords).
+        movsl(p + 8,
+              pp,
+              len - 8);
+
+        // Finally, move the last 8 dwords of the 2nd half to the first 8 dwords
+        // of the first half.
+        movsl(pp + len - 8,
+              p,
+              8);
+#endif
+    }
+}
+
+void block_move_check(ulong* p, ulong* pe, int iter, int me) {
+    /* Now check the data 
+     * The error checking is rather crude.  We just check that the
+     * adjacent words are the same.
+     */
+
+    pe-=2;	/* the last dwords to test are pe[0] and pe[1] */
+    asm __volatile__
+        (
+         "jmp L120\n\t"
+
+         ".p2align 4,,7\n\t"
+         "L124:\n\t"
+         "addl $8,%%edi\n\t" // Next QWORD
+         "L120:\n\t"
+
+         // Compare adjacent DWORDS
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl 4(%%edi),%%ecx\n\t"
+         "jnz L121\n\t" // Print error if they don't match
+
+         // Loop until end of block
+         "L122:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L124\n"
+         "jmp L123\n\t"
+
+         "L121:\n\t"
+         // eax not used so we don't need to save it as per cdecl
+         // ecx is used but not restored, however we don't need it's value anymore after this point
+         "pushl %%edx\n\t"
+         "pushl 4(%%edi)\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%edi\n\t"
+         "call error\n\t"
+         "popl %%edi\n\t"
+         "addl $8,%%esp\n\t"
+         "popl %%edx\n\t"
+         "jmp L122\n"
+         "L123:\n\t"
+         : "=D" (p)
+         : "D" (p), "d" (pe)
+         : "ecx"
+         );
+}
+
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
  */
 void block_move(int iter, int me)
 {
-    int i, j, done;
-    ulong len;
-    ulong *p, *pe, *start, *end, *pp;  // VAs
-
     cprint(LINE_PAT, COL_PAT-2, "          ");
 
     /* Initialize memory with the initial pattern.  */
-    ulong* prev_end = 0;
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 64);
-
-        // end is always xxxxxffc, so increment so that length
-        // calculations are correct
-        end = end + 1;
-
-        // Both start and end should be page aligned, right?
-#if 0
-        ASSERT(0 == (((ulong)start) & 0xfff));
-        ASSERT(0 == (((ulong)end)   & 0xfff));
-
-#else
-        // OK that didn't work (start is not page-aligned)
-        // but surely they're at least cache-line
-        // aligned, right?
-        ASSERT(0 == (((ulong)start) & 0x3f));
-        ASSERT(0 == (((ulong)end)   & 0x3f));
-#endif
-
-        // Ensure no overlap among chunks
-        ASSERT(prev_end <= start);
-        // Why not...
-        ASSERT(start < end);
-
-        pe = start;
-        p = start;
-
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-
-            // p is the start address, and pe the end address,
-            // for the current loop iteration.
-            //
-            // which means 'len' is in units of 64-byte cache lines:
-            len  = ((ulong)pe - (ulong)p) / 64;
-
-            // JPC: confirm we have an even number of cache lines. right?
-            // since we're going to divide it in half.
-            ASSERT(0 == (len & 1));
-
-            if (1) {
-                // TODO(jcoiner):
-                // From a normal functional-analysis perspective,
-                // we only need to initialize len/2, since we're going to
-                // just copy the first half onto the second half in the next
-                // step.
-                //
-                // However, do we actually derive coverage from writing
-                // the 2nd half of the block, and then writing it again?
-                // Is that a difficult operation for memory, to be
-                // rewritten with the same value it contained already? TBD.
-                len = len >> 1;
-            }
-
-#if 0
-            asm __volatile__
-                (
-                 "jmp L100\n\t"
-
-                 ".p2align 4,,7\n\t"
-                 "L100:\n\t"
-
-                 // First loop eax is 0x00000001, edx is 0xfffffffe
-                 "movl %%eax, %%edx\n\t"
-                 "notl %%edx\n\t"
-
-                 // Set a block of 64-bytes	// First loop DWORDS are 
-                 "movl %%eax,0(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,4(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,8(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,12(%%edi)\n\t"	// 0x00000001
-                 "movl %%edx,16(%%edi)\n\t"	// 0xfffffffe
-                 "movl %%edx,20(%%edi)\n\t"	// 0xfffffffe
-                 "movl %%eax,24(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,28(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,32(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,36(%%edi)\n\t"	// 0x00000001
-                 "movl %%edx,40(%%edi)\n\t"	// 0xfffffffe
-                 "movl %%edx,44(%%edi)\n\t"	// 0xfffffffe
-                 "movl %%eax,48(%%edi)\n\t"	// 0x00000001
-                 "movl %%eax,52(%%edi)\n\t"	// 0x00000001
-                 "movl %%edx,56(%%edi)\n\t"	// 0xfffffffe
-                 "movl %%edx,60(%%edi)\n\t"	// 0xfffffffe
-
-                 // rotate left with carry, 
-                 // second loop eax is		 0x00000002
-                 // second loop edx is (~eax) 0xfffffffd
-                 "rcll $1, %%eax\n\t"		
-
-                 // Move current position forward 64-bytes (to start of next block)
-                 "leal 64(%%edi), %%edi\n\t"
-
-                 // Loop until end
-                 "decl %%ecx\n\t"
-                 "jnz  L100\n\t"
-
-                 /*   output */ : "=D" (p)
-                 /*    input */ : "D" (p), "c" (len), "a" (1)
-                 /* clobbers */ : "edx"
-                 );
-#else
-            ulong base_val = 1; // eax is assembly
-            while(len > 0) {
-                ulong neg_val = ~base_val;
-
-                // Set a block of 64 bytes   //   first word DWORDS are:
-                p[0] = base_val;             //   0x00000001
-                p[1] = base_val;             //   0x00000001
-                p[2] = base_val;             //   0x00000001
-                p[3] = base_val;             //   0x00000001
-                p[4] = neg_val;              //   0xfffffffe
-                p[5] = neg_val;              //   etc.
-                p[6] = base_val;
-                p[7] = base_val;
-                p[8] = base_val;
-                p[9] = base_val;
-                p[10] = neg_val;
-                p[11] = neg_val;
-                p[12] = base_val;
-                p[13] = base_val;
-                p[14] = neg_val;
-                p[15] = neg_val;
-
-                p += 16;  // advance p to next cache line
-                len--;
-
-                // Rotate the bit left, including an all-zero state
-                // (I think that's what the original asm did?)
-                // Is the periodicity of 33 significant, is it important
-                // that this not be a power of 2?
-                if (base_val == 0) {
-                    base_val = 1;
-                } else if (base_val & 0x80000000) {
-                    base_val = 0;
-                } else {
-                    base_val = base_val << 1;
-                }
-            }
-#endif
-        } while (!done);
-    }
+    block_move_foreach_segment(iter, me, block_move_init);
     s_barrier();
 
-    /* Now move the data around 
-     * First move the data up half of the segment size we are testing
-     * Then move the data to the original location + 32 bytes
-     */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 64);
-
-        // end is always xxxxxffc, so increment so that length calculations are correct
-        end = end + 1;
-        pe = start;
-        p = start;
-        done = 0;
-
-        do {
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            len  = ((ulong)pe - (ulong)p) / 8; // Half the size of this block in DWORDS
-            pp = p + len;  // Mid-point of this block
-            for(i=0; i<iter; i++) {
-                do_tick(me);
-                { BAILR }
-
-#if 0
-                asm __volatile__
-                    (
-                     "cld\n"
-                     "jmp L110\n\t"
-
-                     ".p2align 4,,7\n\t"
-                     "L110:\n\t"
-
-                     //
-                     // At the end of all this 
-                     // - the second half equals the inital value of the first half
-                     // - the first half is right shifted 32-bytes (with wrapping)
-                     //
-
-                     // Move first half to second half
-                     "movl %1,%%edi\n\t" // Destination, pp (mid point)
-                     "movl %0,%%esi\n\t" // Source, p (start point)
-                     "movl %2,%%ecx\n\t" // Length, len (size of a half in DWORDS)
-                     "rep\n\t"
-                     "movsl\n\t"
-
-                     // Move the second half, less the last 32-bytes. To the first half, offset plus 32-bytes
-                     "movl %0,%%edi\n\t"
-                     "addl $32,%%edi\n\t" // Destination, p(start-point) plus 32 bytes
-                     "movl %1,%%esi\n\t"  // Source, pp(mid-point)
-                     "movl %2,%%ecx\n\t"
-                     "subl $8,%%ecx\n\t"  // Length, len(size of a half in DWORDS) minus 8 DWORDS (32 bytes)
-                     "rep\n\t"
-                     "movsl\n\t"
-
-                     // Move last 8 DWORDS (32-bytes) of the second half to the start of the first half
-                     "movl %0,%%edi\n\t"  // Destination, p(start-point)
-                     // Source, 8 DWORDS from the end of the second half, left over by the last rep/movsl
-                     "movl $8,%%ecx\n\t"  // Length, 8 DWORDS (32-bytes)
-                     "rep\n\t"
-                     "movsl\n\t"
-
-                     :: "g" (p), "g" (pp), "g" (len)
-                     : "edi", "esi", "ecx"
-                     );
-#else
-                // p == block start
-                // pp == midpoint
-                // pe == block end
-                // len == half the size of the block, in DWORDs
-
-                // Move first half to 2nd half:
-                movsl(pp,  // dest
-                      p,   // src
-                      len);
-
-                // Move the second half, less the last 32 bytes (8 dwords) to the first half
-                // plus an offset of 32 bytes (8 dwords).
-                movsl(p + 8,
-                      pp,
-                      len - 8);
-
-                // Finally, move the last 8 dwords of the 2nd half to the first 8 dwords
-                // of the first half.
-                movsl(pp + len - 8,
-                      p,
-                      8);
-#endif
-            }
-            p = pe;
-        } while (!done);
-    }
+    /* Now move the data around */
+    block_move_foreach_segment(iter, me, block_move_move);    
     s_barrier();
 
-    /* Now check the data 
-     * The error checking is rather crude.  We just check that the
-     * adjacent words are the same.
-     */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 64);
-
-        // end is always xxxxxffc, so increment so that length calculations are correct
-        end = end + 1;
-        pe = start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            pe-=2;	/* the last dwords to test are pe[0] and pe[1] */
-            asm __volatile__
-                (
-                 "jmp L120\n\t"
-
-                 ".p2align 4,,7\n\t"
-                 "L124:\n\t"
-                 "addl $8,%%edi\n\t" // Next QWORD
-                 "L120:\n\t"
-
-                 // Compare adjacent DWORDS
-                 "movl (%%edi),%%ecx\n\t"
-                 "cmpl 4(%%edi),%%ecx\n\t"
-                 "jnz L121\n\t" // Print error if they don't match
-
-				// Loop until end of block
-                 "L122:\n\t"
-                 "cmpl %%edx,%%edi\n\t"
-                 "jb L124\n"
-                 "jmp L123\n\t"
-
-                 "L121:\n\t"
-                 // eax not used so we don't need to save it as per cdecl
-                 // ecx is used but not restored, however we don't need it's value anymore after this point
-                 "pushl %%edx\n\t"
-                 "pushl 4(%%edi)\n\t"
-                 "pushl %%ecx\n\t"
-                 "pushl %%edi\n\t"
-                 "call error\n\t"
-                 "popl %%edi\n\t"
-                 "addl $8,%%esp\n\t"
-                 "popl %%edx\n\t"
-                 "jmp L122\n"
-                 "L123:\n\t"
-                 : "=D" (p)
-                 : "D" (p), "d" (pe)
-                 : "ecx"
-                 );
-        } while (!done);
-    }
+    /* And check it. */
+    block_move_foreach_segment(iter, me, block_move_check);
 }
 
 /*
