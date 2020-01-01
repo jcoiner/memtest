@@ -1465,8 +1465,8 @@ void beep(unsigned int frequency)
 {
 #if 1
     // BOZO(jcoiner)
-    // Removed this, pending a correct definition
-    // of outb_p()
+    // Removed this, we need to find a definition of outb_p()
+    // before reintroducing it.
 #else
     unsigned int count = 1193180 / frequency;
 
