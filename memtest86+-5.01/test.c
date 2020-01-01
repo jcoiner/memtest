@@ -350,6 +350,7 @@ void addr_tst2(int me)
 
     /* Write each address with its own address */
     unsliced_foreach_segment(nullptr, me, addr_tst2_init_segment);
+    { BAILR }
 
     /* Each address should have its own address */
     unsliced_foreach_segment(nullptr, me, addr_tst2_check_segment);
@@ -550,204 +551,168 @@ void movinvr(int me)
     }
 }
 
+typedef struct {
+    ulong p1;
+    ulong p2;
+} movinv1_ctx;
+
+void movinv1_init(ulong* start, ulong len_dw, const void* vctx) {
+    const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
+
+    ulong p1 = ctx->p1;
+    ulong* p = start;
+
+    asm __volatile__
+        (
+         "rep\n\t"
+         "stosl\n\t"
+         : : "c" (len_dw), "D" (p), "a" (p1)
+         );
+}
+
+void movinv1_bottom_up(ulong* start, ulong len_dw, const void* vctx) {
+    const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
+    ulong p1 = ctx->p1;
+    ulong p2 = ctx->p2;
+    ulong* p = start;
+    ulong* pe = p + (len_dw - 1);
+
+    // Original C code replaced with hand tuned assembly code 
+    // seems broken
+    /*for (; p <= pe; p++) {
+      if ((bad=*p) != p1) {
+      mt86_error((ulong*)p, p1, bad);
+      }
+      *p = p2;
+      }*/
+
+    asm __volatile__
+        (
+         "jmp L2\n\t"
+         ".p2align 4,,7\n\t"
+         "L0:\n\t"
+         "addl $4,%%edi\n\t"
+         "L2:\n\t"
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl %%eax,%%ecx\n\t"
+         "jne L3\n\t"
+         "L5:\n\t"
+         "movl %%ebx,(%%edi)\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L0\n\t"
+         "jmp L4\n"
+
+         "L3:\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%ebx\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%eax\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "popl %%eax\n\t"
+         "popl %%ecx\n\t"
+         "popl %%ebx\n\t"
+         "popl %%edx\n\t"
+         "jmp L5\n"
+
+         "L4:\n\t"
+         :: "a" (p1), "D" (p), "d" (pe), "b" (p2)
+         : "ecx"
+         );
+}
+
+void movinv1_top_down(ulong* start, ulong len_dw, const void* vctx) {
+    const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
+    ulong p1 = ctx->p1;
+    ulong p2 = ctx->p2;
+    ulong* p = start + (len_dw - 1);
+    ulong* pe = start;
+
+    //Original C code replaced with hand tuned assembly code
+    // seems broken
+    /*do {
+      if ((bad=*p) != p2) {
+      mt86_error((ulong*)p, p2, bad);
+      }
+      *p = p1;
+      } while (--p >= pe);*/
+
+    asm __volatile__
+        (
+         "jmp L9\n\t"
+         ".p2align 4,,7\n\t"
+         "L11:\n\t"
+         "subl $4, %%edi\n\t"
+         "L9:\n\t"
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl %%ebx,%%ecx\n\t"
+         "jne L6\n\t"
+         "L10:\n\t"
+         "movl %%eax,(%%edi)\n\t"
+         "cmpl %%edi, %%edx\n\t"
+         "jne L11\n\t"
+         "jmp L7\n\t"
+
+         "L6:\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%eax\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%ebx\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "popl %%ebx\n\t"
+         "popl %%ecx\n\t"
+         "popl %%eax\n\t"
+         "popl %%edx\n\t"
+         "jmp L10\n"
+
+         "L7:\n\t"
+         :: "a" (p1), "D" (p), "d" (pe), "b" (p2)
+         : "ecx"
+         );
+}
+
+
 /*
  * Test all of memory using a "moving inversions" algorithm using the
  * pattern in p1 and its complement in p2.
  */
 void movinv1 (int iter, ulong p1, ulong p2, int me)
 {
-    int i, j, done;
-    ulong *p, *pe, len, *start, *end;
+    int i;
 
     /* Display the current pattern */
     if (mstr_cpu == me) hprint(LINE_PAT, COL_PAT, p1);
 
-    /* Initialize memory with the initial pattern.  */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 4);
-
-        pe = start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            len = pe - p + 1;
-            if (p == pe ) {
-                break;
-            }
-
-            //Original C code replaced with hand tuned assembly code
-            // seems broken
-            /*for (; p <= pe; p++) {
-             *p = p1;
-             }*/
-
-            asm __volatile__ (
-                              "rep\n\t" \
-                              "stosl\n\t"
-                              : : "c" (len), "D" (p), "a" (p1)
-                              );
-
-            p = pe + 1;
-        } while (!done);
-    }
+    movinv1_ctx ctx;
+    ctx.p1 = p1;
+    ctx.p2 = p2;
+    sliced_foreach_segment(&ctx, me, movinv1_init);
+    { BAILR }
 
     /* Do moving inversions test. Check for initial pattern and then
      * write the complement for each memory location. Test from bottom
      * up and then from the top down.  */
     for (i=0; i<iter; i++) {
-        for (j=0; j<segs; j++) {
-            calculate_chunk(&start, &end, me, j, 4);
-            pe = start;
-            p = start;
-            done = 0;
-            do {
-                do_tick(me);
-                { BAILR }
+        sliced_foreach_segment(&ctx, me, movinv1_bottom_up);
+        { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
-                if (pe >= end) {
-                    pe = end;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-
-                // Original C code replaced with hand tuned assembly code 
-                // seems broken
-                /*for (; p <= pe; p++) {
-                  if ((bad=*p) != p1) {
-                  mt86_error((ulong*)p, p1, bad);
-                  }
-                  *p = p2;
-                  }*/
-
-                asm __volatile__ (
-                                  "jmp L2\n\t" \
-                                  ".p2align 4,,7\n\t" \
-                                  "L0:\n\t" \
-                                  "addl $4,%%edi\n\t" \
-                                  "L2:\n\t" \
-                                  "movl (%%edi),%%ecx\n\t" \
-                                  "cmpl %%eax,%%ecx\n\t" \
-                                  "jne L3\n\t" \
-                                  "L5:\n\t" \
-                                  "movl %%ebx,(%%edi)\n\t" \
-                                  "cmpl %%edx,%%edi\n\t" \
-                                  "jb L0\n\t" \
-                                  "jmp L4\n" \
-
-                                  "L3:\n\t" \
-                                  "pushl %%edx\n\t" \
-                                  "pushl %%ebx\n\t" \
-                                  "pushl %%ecx\n\t" \
-                                  "pushl %%eax\n\t" \
-                                  "pushl %%edi\n\t" \
-                                  "call mt86_error\n\t" \
-                                  "popl %%edi\n\t" \
-                                  "popl %%eax\n\t" \
-                                  "popl %%ecx\n\t" \
-                                  "popl %%ebx\n\t" \
-                                  "popl %%edx\n\t" \
-                                  "jmp L5\n" \
-
-                                  "L4:\n\t" \
-                                  :: "a" (p1), "D" (p), "d" (pe), "b" (p2)
-                                  : "ecx"
-                                  );
-                p = pe + 1;
-            } while (!done);
-        }
-        for (j=segs-1; j>=0; j--) {
-            calculate_chunk(&start, &end, me, j, 4);
-            pe = end;
-            p = end;
-            done = 0;
-            do {
-                do_tick(me);
-                { BAILR }
-
-                /* Check for underflow */
-                if (pe - SPINSZ_DWORDS < pe && pe != 0) {
-                    pe -= SPINSZ_DWORDS;
-                } else {
-                    pe = start;
-                    done++;
-                }
-
-                /* Since we are using unsigned addresses a 
-                 * redundant check is required */
-                if (pe < start || pe > end) {
-                    pe = start;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-
-                //Original C code replaced with hand tuned assembly code
-                // seems broken
-                /*do {
-                  if ((bad=*p) != p2) {
-                  mt86_error((ulong*)p, p2, bad);
-                  }
-                  *p = p1;
-                  } while (--p >= pe);*/
-
-                asm __volatile__ (
-                                  "jmp L9\n\t"
-                                  ".p2align 4,,7\n\t"
-                                  "L11:\n\t"
-                                  "subl $4, %%edi\n\t"
-                                  "L9:\n\t"
-                                  "movl (%%edi),%%ecx\n\t"
-                                  "cmpl %%ebx,%%ecx\n\t"
-                                  "jne L6\n\t"
-                                  "L10:\n\t"
-                                  "movl %%eax,(%%edi)\n\t"
-                                  "cmpl %%edi, %%edx\n\t"
-                                  "jne L11\n\t"
-                                  "jmp L7\n\t"
-
-                                  "L6:\n\t"
-                                  "pushl %%edx\n\t"
-                                  "pushl %%eax\n\t"
-                                  "pushl %%ecx\n\t"
-                                  "pushl %%ebx\n\t"
-                                  "pushl %%edi\n\t"
-                                  "call mt86_error\n\t"
-                                  "popl %%edi\n\t"
-                                  "popl %%ebx\n\t"
-                                  "popl %%ecx\n\t"
-                                  "popl %%eax\n\t"
-                                  "popl %%edx\n\t"
-                                  "jmp L10\n"
-
-                                  "L7:\n\t"
-                                  :: "a" (p1), "D" (p), "d" (pe), "b" (p2)
-                                  : "ecx"
-                                  );
-                p = pe - 1;
-            } while (!done);
-        }
+        // NOTE(jcoiner):
+        // For the top-down pass, the original 5.01 code iterated over
+        // 'segs' in from n-1 down to 0, and then within each mapped segment,
+        // it would form the SPINSZ windows from the top down -- thus forming
+        // a different set of windows than the bottom-up pass, when the segment
+        // is not an integer number of windows.
+        //
+        // My guess is that this buys us very little additional coverage, that
+        // the value in going top-down happens at the word or cache-line level
+        // and that there's little to be gained from reversing the direction of
+        // the outer loops. So I'm leaving a 'direction' bit off of the
+        // foreach_segment() routines for now.
+        sliced_foreach_segment(&ctx, me, movinv1_top_down);
+        { BAILR }
     }
 }
 
@@ -1370,10 +1335,12 @@ void block_move(int iter, int me)
     
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
+    { BAILR }
     s_barrier();
 
     /* Now move the data around */
     sliced_foreach_segment(&ctx, me, block_move_move);
+    { BAILR }
     s_barrier();
 
     /* And check it. */

@@ -101,14 +101,13 @@ int main() {
     const ulong pat = 0x112211ee;
     movinv1(iter, pat, ~pat, 0);
 
+
 #if 0
-    // What we unfortunately can't test easily in userspace,
-    // that we need to test, is VA's aligned near the top of 4G.
+    // TODO: test the foreach routines with boundary address near 4G
     //
-    // I mean, we can't malloc up there (it's where linux puts the stack)
-    // but we can invent VAs up there and run a cut-down routine
-    // that doesn't actually touch memory but only reports what it would
-    // have done.
+    // We can't malloc up there (it's where linux puts the stack)
+    // but we can invent VAs up there so long as we don't attempt to access
+    // them.
     vv->map[0].start = (ulong*)0xe0000000;
     vv->map[0].end   = (ulong*)0xfffffffc;
     movinv1(iter, pat, ~pat, 0);
