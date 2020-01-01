@@ -92,15 +92,20 @@ int main() {
     const int iter = 1;
     const int me = 0;  // cpu ordinal
 
+    // TEST 0
     // NOTE: in prod, this runs with cache disabled
     //       but we can't do anything about the cache in userspace.
     addr_tst1(me);
 
+    // TEST 1, 2
     addr_tst2(me);
 
+    // TEST 3, 4, 5, 6
     const ulong pat = 0x112211ee;
     movinv1(iter, pat, ~pat, 0);
 
+    // TEST 9
+    movinvr(me);
 
 #if 0
     // TODO: test the foreach routines with boundary address near 4G

@@ -356,6 +356,133 @@ void addr_tst2(int me)
     unsliced_foreach_segment(nullptr, me, addr_tst2_check_segment);
 }
 
+typedef struct {
+    int me;
+    ulong xorVal;    
+} movinvr_ctx;
+
+void movinvr_init(ulong* p,
+                  ulong len_dw,
+                  const void* vctx) {
+    ulong* pe = p + (len_dw - 1);
+    const movinvr_ctx* ctx = (const movinvr_ctx*)vctx;
+    /* Original C code replaced with hand tuned assembly code */
+    /*
+      for (; p <= pe; p++) {
+      *p = rand(me);
+      }
+    */
+
+    asm __volatile__
+        (
+         "jmp L200\n\t"
+         ".p2align 4,,7\n\t"
+         "L201:\n\t"
+         "addl $4,%%edi\n\t"
+         "L200:\n\t"
+         "pushl %%ecx\n\t"
+         "call rand\n\t"
+         "popl %%ecx\n\t"
+         "movl %%eax,(%%edi)\n\t"
+         "cmpl %%ebx,%%edi\n\t"
+         "jb L201\n\t"
+         : : "D" (p), "b" (pe), "c" (ctx->me)
+         : "eax"
+         );
+}
+
+void movinvr_body(ulong* p,
+                  ulong len_dw,
+                  const void* vctx) {
+    ulong* pe = p + (len_dw - 1);
+    const movinvr_ctx* ctx = (const movinvr_ctx*)vctx;
+
+    /* Original C code replaced with hand tuned assembly code */
+				
+    /*for (; p <= pe; p++) {
+      num = rand(me);
+      if (i) {
+      num = ~num;
+      }
+      if ((bad=*p) != num) {
+      mt86_error((ulong*)p, num, bad);
+      }
+      *p = ~num;
+      }*/
+
+    asm __volatile__
+        (
+         "pushl %%ebp\n\t"
+
+         // Skip first increment
+         "jmp L26\n\t"
+         ".p2align 4,,7\n\t"
+
+         // increment 4 bytes (32-bits)
+         "L27:\n\t"
+         "addl $4,%%edi\n\t"
+
+         // Check this byte
+         "L26:\n\t"
+
+         // Get next random number, pass in me(edx), random value returned in num(eax)
+         // num = rand(me);
+         // cdecl call maintains all registers except eax, ecx, and edx
+         // We maintain edx with a push and pop here using it also as an input
+         // we don't need the current eax value and want it to change to the return value
+         // we overwrite ecx shortly after this discarding its current value
+         "pushl %%edx\n\t" // Push function inputs onto stack
+         "call rand\n\t"
+         "popl %%edx\n\t" // Remove function inputs from stack
+
+         // XOR the random number with xorVal(ebx), which is either 0xffffffff or 0 depending on the outer loop
+         // if (i) { num = ~num; }
+         "xorl %%ebx,%%eax\n\t"
+
+         // Move the current value of the current position p(edi) into bad(ecx)
+         // (bad=*p)
+         "movl (%%edi),%%ecx\n\t"
+
+         // Compare bad(ecx) to num(eax)
+         "cmpl %%eax,%%ecx\n\t"
+
+         // If not equal jump the error case
+         "jne L23\n\t"
+
+         // Set a new value or not num(eax) at the current position p(edi)
+         // *p = ~num;
+         "L25:\n\t"
+         "movl $0xffffffff,%%ebp\n\t"
+         "xorl %%ebp,%%eax\n\t"
+         "movl %%eax,(%%edi)\n\t"
+
+         // Loop until current position p(edi) equals the end position pe(esi)
+         "cmpl %%esi,%%edi\n\t"
+         "jb L27\n\t"
+         "jmp L24\n"
+
+         // Error case
+         "L23:\n\t"
+         // Must manually maintain eax, ecx, and edx as part of cdecl call convention
+         "pushl %%edx\n\t"
+         "pushl %%ecx\n\t" // Next three pushes are functions input
+         "pushl %%eax\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t" // Remove function inputs from stack and restore register values
+         "popl %%eax\n\t"
+         "popl %%ecx\n\t"
+         "popl %%edx\n\t"
+         "jmp L25\n" 
+
+         "L24:\n\t"
+         "popl %%ebp\n\t"
+         :: "D" (p), "S" (pe), "b" (ctx->xorVal),
+          "d" (ctx->me)
+         : "eax", "ecx"
+         );
+}
+
 /*
  * Test all of memory using a "half moving inversions" algorithm using random
  * numbers and their complement as the data pattern. Since we are not able to
@@ -364,11 +491,11 @@ void addr_tst2(int me)
  */
 void movinvr(int me)
 {
-    int i, j, done, seed1, seed2;
-    ulong *p;
-    ulong *pe;
-    ulong *start,*end;
-    ulong xorVal;
+    int i, seed1, seed2;
+
+    movinvr_ctx ctx;
+    ctx.me = me;
+    ctx.xorVal = 0;
 
     /* Initialize memory with initial sequence of random numbers.  */
     if (cpu_id.fid.bits.rdtsc) {
@@ -381,173 +508,24 @@ void movinvr(int me)
     /* Display the current seed */
     if (mstr_cpu == me) hprint(LINE_PAT, COL_PAT, seed1);
     rand_seed(seed1, seed2, me);
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 4);
-        pe = start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
 
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            /* Original C code replaced with hand tuned assembly code */
-            /*
-              for (; p <= pe; p++) {
-              *p = rand(me);
-              }
-            */
-
-            asm __volatile__ (
-                              "jmp L200\n\t"
-                              ".p2align 4,,7\n\t"
-                              "L201:\n\t"
-                              "addl $4,%%edi\n\t"
-                              "L200:\n\t"
-                              "pushl %%ecx\n\t" \
-                              "call rand\n\t"
-                              "popl %%ecx\n\t" \
-                              "movl %%eax,(%%edi)\n\t"
-                              "cmpl %%ebx,%%edi\n\t"
-                              "jb L201\n\t"
-                              : : "D" (p), "b" (pe), "c" (me)
-                              : "eax"
-                              );
-            p = pe + 1;
-        } while (!done);
-    }
+    sliced_foreach_segment(&ctx, me, movinvr_init);
+    { BAILR }
 
     /* Do moving inversions test. Check for initial pattern and then
      * write the complement for each memory location.
      */
     for (i=0; i<2; i++) {
         rand_seed(seed1, seed2, me);
-        for (j=0; j<segs; j++) {
-            calculate_chunk(&start, &end, me, j, 4);
-            pe = start;
-            p = start;
-            done = 0;
-            do {
-                do_tick(me);
-                { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
-                if (pe >= end) {
-                    pe = end;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-                /* Original C code replaced with hand tuned assembly code */
-				
-                /*for (; p <= pe; p++) {
-                  num = rand(me);
-                  if (i) {
-                  num = ~num;
-                  }
-                  if ((bad=*p) != num) {
-                  mt86_error((ulong*)p, num, bad);
-                  }
-                  *p = ~num;
-                  }*/
-
-                if (i) {
-                    xorVal = 0xffffffff;
-                } else {
-                    xorVal = 0;
-                }
-                asm __volatile__ (
-					
-                                  "pushl %%ebp\n\t"
-
-                                  // Skip first increment
-                                  "jmp L26\n\t"
-                                  ".p2align 4,,7\n\t"
-
-                                  // increment 4 bytes (32-bits)
-                                  "L27:\n\t"
-                                  "addl $4,%%edi\n\t"
-
-                                  // Check this byte
-                                  "L26:\n\t"
-
-                                  // Get next random number, pass in me(edx), random value returned in num(eax)
-                                  // num = rand(me);
-                                  // cdecl call maintains all registers except eax, ecx, and edx
-                                  // We maintain edx with a push and pop here using it also as an input
-                                  // we don't need the current eax value and want it to change to the return value
-                                  // we overwrite ecx shortly after this discarding its current value
-                                  "pushl %%edx\n\t" // Push function inputs onto stack
-                                  "call rand\n\t"
-                                  "popl %%edx\n\t" // Remove function inputs from stack
-
-                                  // XOR the random number with xorVal(ebx), which is either 0xffffffff or 0 depending on the outer loop
-                                  // if (i) { num = ~num; }
-                                  "xorl %%ebx,%%eax\n\t"
-
-                                  // Move the current value of the current position p(edi) into bad(ecx)
-                                  // (bad=*p)
-                                  "movl (%%edi),%%ecx\n\t"
-
-                                  // Compare bad(ecx) to num(eax)
-                                  "cmpl %%eax,%%ecx\n\t"
-
-                                  // If not equal jump the error case
-                                  "jne L23\n\t"
-
-                                  // Set a new value or not num(eax) at the current position p(edi)
-                                  // *p = ~num;
-                                  "L25:\n\t"
-                                  "movl $0xffffffff,%%ebp\n\t"
-                                  "xorl %%ebp,%%eax\n\t"
-                                  "movl %%eax,(%%edi)\n\t"
-
-                                  // Loop until current position p(edi) equals the end position pe(esi)
-                                  "cmpl %%esi,%%edi\n\t"
-                                  "jb L27\n\t"
-                                  "jmp L24\n"
-
-                                  // Error case
-                                  "L23:\n\t"
-                                  // Must manually maintain eax, ecx, and edx as part of cdecl call convention
-                                  "pushl %%edx\n\t"
-                                  "pushl %%ecx\n\t" // Next three pushes are functions input
-                                  "pushl %%eax\n\t"
-                                  "pushl %%edi\n\t"
-                                  "call mt86_error\n\t"
-                                  "popl %%edi\n\t" // Remove function inputs from stack and restore register values
-                                  "popl %%eax\n\t"
-                                  "popl %%ecx\n\t"
-                                  "popl %%edx\n\t"
-                                  "jmp L25\n" 
-
-                                  "L24:\n\t"
-                                  "popl %%ebp\n\t"
-                                  :: "D" (p), "S" (pe), "b" (xorVal),
-                                   "d" (me)
-                                  : "eax", "ecx"
-                                  );
-                p = pe + 1;
-            } while (!done);
+        if (i) {
+            ctx.xorVal = 0xffffffff;
+        } else {
+            ctx.xorVal = 0;
         }
+
+        sliced_foreach_segment(&ctx, me, movinvr_body);
+        { BAILR }
     }
 }
 
