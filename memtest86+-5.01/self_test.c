@@ -73,16 +73,35 @@ int main() {
     const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 512;
 
     segs = 1;
-    vv->map[0].start = malloc(kTestSizeDwords * sizeof(ulong));
-    vv->map[0].end = vv->map[0].start + kTestSizeDwords - 1;
+    ulong start = (ulong)malloc(kTestSizeDwords * sizeof(ulong));
+    ulong end = start + kTestSizeDwords * sizeof(ulong);
+
+    // align 'start' to a cache line:
+    if (start & 0x3f) {
+        start &= ~0x3f;
+        start += 0x40;
+    }
+    // align 'end' to a cache line:
+    if (end & 0x3f) {
+        end &= ~0x3f;
+    }
+
+    vv->map[0].start = (ulong*)start;
+    vv->map[0].end = ((ulong*)end) - 1;  // map.end points to xxxxxfc
 
     const int iter = 1;
+    const int me = 0;  // cpu ordinal
+
+    // NOTE: in prod, this runs with cache disabled
+    //       but we can't do anything about the cache in userspace.
+    addr_tst1(me);
+
+    addr_tst2(me);
 
     const ulong pat = 0x112211ee;
-#if 0
     movinv1(iter, pat, ~pat, 0);
 
-#else
+#if 0
     // What we unfortunately can't test easily in userspace,
     // that we need to test, is VA's aligned near the top of 4G.
     //

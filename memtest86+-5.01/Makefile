@@ -13,7 +13,7 @@ AS=as -32
 CC=gcc
 
 CFLAGS= -Wall -Werror -march=i486 -m32 -O1 -fomit-frame-pointer -fno-builtin \
-	-ffreestanding -fPIC $(SMP_FL) -fno-stack-protector 
+	-ffreestanding -fPIC $(SMP_FL) -fno-stack-protector -g
 
 SELF_TEST_CFLAGS = -Wall -Werror -march=i486 -m32 -O1 -g
 
@@ -57,10 +57,6 @@ memtest.bin: memtest_shared.bin bootsect.o setup.o memtest.bin.lds
 
 reloc.o: reloc.c
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing reloc.c
-
-# JPC BOZO: try -O1 here once the bugs are fixed.
-test.o: test.c
-	$(CC) -c -Wall -march=i486 -m32 -O0 -fomit-frame-pointer -fno-builtin -ffreestanding test.c
 
 self_test.o : self_test.c
 	$(CC) -c $(SELF_TEST_CFLAGS) self_test.c
