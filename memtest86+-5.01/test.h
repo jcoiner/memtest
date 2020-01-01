@@ -137,7 +137,7 @@ void movinv32(int iter, ulong p1, ulong lb, ulong mb, int sval, int off,
 	int cpu);
 void modtst(int off, int iter, ulong p1, ulong p2, int cpu);
 void assert_fail(const char* file, int line_no);
-void error(ulong* adr, ulong good, ulong bad);
+void mt86_error(ulong* adr, ulong good, ulong bad);
 void ad_err1(ulong *adr1, ulong *adr2, ulong good, ulong bad);
 void ad_err2(ulong *adr, ulong bad);
 void do_tick();
@@ -191,6 +191,16 @@ void bit_fade_fill(unsigned long n, int cpu);
 void bit_fade_chk(unsigned long n, int cpu);
 void find_ticks_for_pass(void);
 void beep(unsigned int frequency);
+
+// In self-test, DEBUGF wraps libc's printf.
+// In memtest standalone, printf will be a stub
+// and 'vv->debugging' is false to avoid call overhead.
+int printf(const char *format, ...);
+#define DEBUGF(...) {            \
+        if (vv->debugging) {     \
+            printf(__VA_ARGS__); \
+        }                        \
+    }
 
 #define PRINTMODE_SUMMARY   0
 #define PRINTMODE_ADDRESSES 1
@@ -303,6 +313,7 @@ struct vars {
     int fail_safe;
     int each_sec;
     int beepmode;
+    int debugging;  // Set in selftest only
 };
 
 #define FIRMWARE_UNKNOWN   0

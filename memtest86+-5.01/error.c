@@ -62,7 +62,7 @@ void assert_fail(const char* file, int line_no) {
 /*
  * Display data error message. Don't display duplicate errors.
  */
-void error(ulong *adr, ulong good, ulong bad)
+void mt86_error(ulong *adr, ulong good, ulong bad)
 {
     ulong xor;
 

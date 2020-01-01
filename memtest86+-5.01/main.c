@@ -149,6 +149,7 @@ void set_defaults()
     vv->ecc_ecount = 0;
     vv->msg_line = LINE_SCROLL-1;
     vv->scroll_start = vv->msg_line * 160;
+    vv->debugging = 0;
     vv->erri.low_addr.page = 0x7fffffff;
     vv->erri.low_addr.offset = 0xfff;
     vv->erri.high_addr.page = 0;

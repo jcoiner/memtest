@@ -463,7 +463,7 @@ void movinvr(int me)
                   num = ~num;
                   }
                   if ((bad=*p) != num) {
-                  error((ulong*)p, num, bad);
+                  mt86_error((ulong*)p, num, bad);
                   }
                   *p = ~num;
                   }*/
@@ -531,7 +531,7 @@ void movinvr(int me)
                                   "pushl %%ecx\n\t" // Next three pushes are functions input
                                   "pushl %%eax\n\t"
                                   "pushl %%edi\n\t"
-                                  "call error\n\t"
+                                  "call mt86_error\n\t"
                                   "popl %%edi\n\t" // Remove function inputs from stack and restore register values
                                   "popl %%eax\n\t"
                                   "popl %%ecx\n\t"
@@ -635,7 +635,7 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
                 // seems broken
                 /*for (; p <= pe; p++) {
                   if ((bad=*p) != p1) {
-                  error((ulong*)p, p1, bad);
+                  mt86_error((ulong*)p, p1, bad);
                   }
                   *p = p2;
                   }*/
@@ -661,7 +661,7 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
                                   "pushl %%ecx\n\t" \
                                   "pushl %%eax\n\t" \
                                   "pushl %%edi\n\t" \
-                                  "call error\n\t" \
+                                  "call mt86_error\n\t" \
                                   "popl %%edi\n\t" \
                                   "popl %%eax\n\t" \
                                   "popl %%ecx\n\t" \
@@ -707,7 +707,7 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
                 // seems broken
                 /*do {
                   if ((bad=*p) != p2) {
-                  error((ulong*)p, p2, bad);
+                  mt86_error((ulong*)p, p2, bad);
                   }
                   *p = p1;
                   } while (--p >= pe);*/
@@ -733,7 +733,7 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
                                   "pushl %%ecx\n\t"
                                   "pushl %%ebx\n\t"
                                   "pushl %%edi\n\t"
-                                  "call error\n\t"
+                                  "call mt86_error\n\t"
                                   "popl %%edi\n\t"
                                   "popl %%ebx\n\t"
                                   "popl %%ecx\n\t"
@@ -857,7 +857,7 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
                 /* Original C code replaced with hand tuned assembly code
                  *				while (1) {
                  *					if ((bad=*p) != pat) {
-                 *						error((ulong*)p, pat, bad);
+                 *						mt86_error((ulong*)p, pat, bad);
                  *					}
                  *					*p = ~pat;
                  *					if (p >= pe) break;
@@ -909,7 +909,7 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
                                   "pushl %%ebp\n\t"
                                   "pushl %%ecx\n\t"
                                   "pushl %%edi\n\t"
-                                  "call error\n\t"
+                                  "call mt86_error\n\t"
                                   "popl %%edi\n\t"
                                   "popl %%ecx\n\t"
                                   "popl %%ebp\n\t"
@@ -967,7 +967,7 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
                 /* Original C code replaced with hand tuned assembly code
                  *				while(1) {
                  *					if ((bad=*p) != ~pat) {
-                 *						error((ulong*)p, ~pat, bad);
+                 *						mt86_error((ulong*)p, ~pat, bad);
                  *					}
                  *					*p = pat;
                  if (p >= pe) break;
@@ -1018,7 +1018,7 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
                                   "pushl %%ebp\n\t"
                                   "pushl %%ecx\n\t"
                                   "pushl %%edi\n\t"
-                                  "call error\n\t"
+                                  "call mt86_error\n\t"
                                   "popl %%edi\n\t"
                                   "popl %%ecx\n\t"
                                   "popl %%ebp\n\t"
@@ -1190,7 +1190,7 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
             /* Original C code replaced with hand tuned assembly code
              *			for (; p <= pe; p += MOD_SZ) {
              *				if ((bad=*p) != p1) {
-             *					error((ulong*)p, p1, bad);
+             *					mt86_error((ulong*)p, p1, bad);
              *				}
              *			}
              */
@@ -1213,7 +1213,7 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
                               "pushl %%ecx\n\t"
                               "pushl %%eax\n\t"
                               "pushl %%edi\n\t"
-                              "call error\n\t"
+                              "call mt86_error\n\t"
                               "popl %%edi\n\t"
                               "popl %%eax\n\t"
                               "popl %%ecx\n\t"
@@ -1351,7 +1351,7 @@ void block_move_check(ulong* p, ulong len_dw, const void* unused_ctx) {
      */
     for (ulong i = 0; i < len_dw; i = i + 2) {
         if (p[i] != p[i+1]) {
-            error(p+i, p[i], p[i+1]);
+            mt86_error(p+i, p[i], p[i+1]);
         }
     }
 }
@@ -1457,7 +1457,7 @@ void bit_fade_chk(ulong p1, int me)
             }
             for (; p < pe;) {
                 if ((bad=*p) != p1) {
-                    error((ulong*)p, p1, bad);
+                    mt86_error((ulong*)p, p1, bad);
                 }
                 p++;
             }
