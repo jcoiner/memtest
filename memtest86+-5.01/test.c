@@ -8,7 +8,7 @@
  * http://www.canardpc.com - http://www.memtest.org
  * Thanks to Passmark for calculate_chunk() and various comments !
  */
- 
+
 #include "test.h"
 #include "config.h"
 #include "stdint.h"
@@ -652,7 +652,6 @@ void movinv1_top_down(ulong* start, ulong len_dw, const void* vctx) {
          );
 }
 
-
 /*
  * Test all of memory using a "moving inversions" algorithm using the
  * pattern in p1 and its complement in p2.
@@ -913,8 +912,8 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
                  *						mt86_error((ulong*)p, ~pat, bad);
                  *					}
                  *					*p = pat;
-                 if (p >= pe) break;
-                 p++;
+                 *                                      if (p >= pe) break;
+                 *                                      p++;
                  *					if (--k <= 0) {
                  *						pat = hb;
                  *						k = 32;
