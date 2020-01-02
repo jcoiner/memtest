@@ -1,6 +1,7 @@
 # memtest
 
-Fork of memtest86+ 5.01 with improvements on correctness and code readability.
+Fork of memtest86+ 5.01. Improves correctness, code health, and code readability
+while maintaining the performance and coverage at levels at least as good as 5.01.
 
 Non-goals of this fork:
  - Support UEFI
@@ -83,3 +84,8 @@ Non-goals of this fork:
    performs within a measurement error of the original, and should be easier
    to inspect and maintain. It still fails on a flaky machine which
    also fails the original block move test, with the same failure mode.
+
+ - In test 10 (modtst) replace assembly with C. It had to be modified to
+   work with the new loop bounds logic. I would rather maintain C than
+   assembly. I confirmed that gcc's output looks just as tight
+   as the original handwritten assembly.
