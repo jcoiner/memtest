@@ -65,7 +65,7 @@ int main() {
 
     get_cpuid();
 
-    const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 512;
+    const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 508;
 
     // Allocate an extra cache line on each end, where we'll
     // write a sentinel pattern to detect overflow or underflow:
@@ -95,7 +95,7 @@ int main() {
     vv->map[0].start = (ulong*)start;
     vv->map[0].end = ((ulong*)end) - 1;  // map.end points to xxxxxfc
 
-    const int iter = 1;
+    const int iter = 2;
     const int me = 0;  // cpu ordinal
 
     // TEST 0
@@ -109,6 +109,12 @@ int main() {
     // TEST 3, 4, 5, 6
     const ulong pat = 0x112211ee;
     movinv1(iter, pat, ~pat, 0);
+
+    // TEST 7
+    block_move(iter, me);
+
+    // TEST 8
+    movinv32(iter, 0x2, 0x1, 0x80000000, 0, 1, me);
 
     // TEST 9
     movinvr(me);

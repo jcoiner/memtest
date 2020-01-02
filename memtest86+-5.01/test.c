@@ -693,6 +693,257 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
     }
 }
 
+typedef struct {
+    ulong p1;
+    ulong lb;
+    ulong hb;
+    int sval;
+    int off;
+} movinv32_ctx;
+
+void movinv32_init(ulong* restrict buf, ulong len_dw, const void* vctx) {
+    const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
+
+    ulong* p = buf;
+    ulong* pe = buf + (len_dw - 1);
+
+    int k = ctx->off;
+    ulong pat = ctx->p1;
+    ulong lb = ctx->lb;
+    int sval = ctx->sval;
+
+    /* Original C code replaced with hand tuned assembly code
+     *			while (p <= pe) {
+     *				*p = pat;
+     *				if (++k >= 32) {
+     *					pat = lb;
+     *					k = 0;
+     *				} else {
+     *					pat = pat << 1;
+     *					pat |= sval;
+     *				}
+     *				p++;
+     *			}
+     */
+    asm __volatile__
+        (
+         "jmp L20\n\t"
+         ".p2align 4,,7\n\t"
+         "L923:\n\t"
+         "addl $4,%%edi\n\t"
+         "L20:\n\t"
+         "movl %%ecx,(%%edi)\n\t"
+         "addl $1,%%ebx\n\t"
+         "cmpl $32,%%ebx\n\t"
+         "jne L21\n\t"
+         "movl %%esi,%%ecx\n\t"
+         "xorl %%ebx,%%ebx\n\t"
+         "jmp L22\n"
+         "L21:\n\t"
+         "shll $1,%%ecx\n\t"
+         "orl %%eax,%%ecx\n\t"
+         "L22:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L923\n\t"
+         :: "D" (p),"d" (pe),"b" (k),"c" (pat),
+           "a" (sval), "S" (lb)
+         );
+}
+
+void movinv32_bottom_up(ulong* restrict buf, ulong len_dw, const void* vctx) {
+    const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
+
+    ulong* p = buf;
+    ulong* pe = buf + (len_dw - 1);
+
+    int k = ctx->off;
+    ulong pat = ctx->p1;
+    ulong lb = ctx->lb;
+    int sval = ctx->sval;
+
+    /* Original C code replaced with hand tuned assembly code
+     *				while (1) {
+     *					if ((bad=*p) != pat) {
+     *						mt86_error((ulong*)p, pat, bad);
+     *					}
+     *					*p = ~pat;
+     *					if (p >= pe) break;
+     *					p++;
+     *
+     *					if (++k >= 32) {
+     *						pat = lb;
+     *						k = 0;
+     *					} else {
+     *						pat = pat << 1;
+     *						pat |= sval;
+     *					}
+     *				}
+     */
+    asm __volatile__
+        (
+         "pushl %%ebp\n\t"
+         "jmp L30\n\t"
+         ".p2align 4,,7\n\t"
+         "L930:\n\t"
+         "addl $4,%%edi\n\t"
+         "L30:\n\t"
+         "movl (%%edi),%%ebp\n\t"
+         "cmpl %%ecx,%%ebp\n\t"
+         "jne L34\n\t"
+
+         "L35:\n\t"
+         "notl %%ecx\n\t"
+         "movl %%ecx,(%%edi)\n\t"
+         "notl %%ecx\n\t"
+         "incl %%ebx\n\t"
+         "cmpl $32,%%ebx\n\t"
+         "jne L31\n\t"
+         "movl %%esi,%%ecx\n\t"
+         "xorl %%ebx,%%ebx\n\t"
+         "jmp L32\n"
+         "L31:\n\t"
+         "shll $1,%%ecx\n\t"
+         "orl %%eax,%%ecx\n\t"
+         "L32:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L930\n\t"
+         "jmp L33\n\t"
+
+         "L34:\n\t"
+         "pushl %%esi\n\t"
+         "pushl %%eax\n\t"
+         "pushl %%ebx\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%ebp\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "popl %%ecx\n\t"
+         "popl %%ebp\n\t"
+         "popl %%edx\n\t"
+         "popl %%ebx\n\t"
+         "popl %%eax\n\t"
+         "popl %%esi\n\t"
+         "jmp L35\n"
+
+         "L33:\n\t"
+         "popl %%ebp\n\t"
+         : "=b" (k),"=c" (pat)
+         : "D" (p),"d" (pe),"b" (k),"c" (pat),
+           "a" (sval), "S" (lb)
+         );
+}
+
+void movinv32_top_down(ulong* restrict buf, ulong len_dw, const void* vctx) {
+    const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
+
+    ulong* pe = buf;
+    ulong* p = buf + (len_dw - 1);
+
+    int k = ctx->off;
+    ulong pat = ctx->p1;
+    ulong hb = ctx->hb;
+    int sval = ctx->sval;
+    ulong p3 = (ulong)sval << 31;
+
+    // Advance 'k' and 'pat' to where they would have been
+    // at the end of the corresponding bottom_up segment.
+    //
+    // The '-1' is because we didn't advance 'k' or 'pat'
+    // on the final bottom_up loop, so they're off by one...
+    ulong mod_len = (len_dw - 1) % 32;
+    for (int i = 0; i < mod_len; i++) {
+        if (++k >= 32) {
+            pat = ctx->lb;
+            k = 0;
+        } else {
+            pat = pat << 1;
+            pat |= sval;
+        }
+    }
+
+    // Increment 'k' only because the code below has an off-by-one
+    // interpretation of 'k' relative to the bottom_up routine.
+    // There it ranges from 0:31, and here it ranges from 1:32.
+    k++;
+
+    /* Original C code replaced with hand tuned assembly code */
+#if 0
+    ulong bad;
+    while(1) {
+        if ((bad=*p) != ~pat) {
+            mt86_error((ulong*)p, ~pat, bad);
+        }
+        *p = pat;
+        if (p <= pe) break;
+        p--;
+
+        if (--k <= 0) {
+            k = 32;
+            pat = hb;
+        } else {
+            pat = pat >> 1;
+            pat |= p3;
+        }
+    };
+#else
+    asm __volatile__
+        (
+         "pushl %%ebp\n\t"
+         "jmp L40\n\t"
+         ".p2align 4,,7\n\t"
+         "L49:\n\t"
+         "subl $4,%%edi\n\t"
+         "L40:\n\t"
+         "movl (%%edi),%%ebp\n\t"
+         "notl %%ecx\n\t"
+         "cmpl %%ecx,%%ebp\n\t"
+         "jne L44\n\t"
+
+         "L45:\n\t"
+         "notl %%ecx\n\t"
+         "movl %%ecx,(%%edi)\n\t"
+         "decl %%ebx\n\t"
+         "cmpl $0,%%ebx\n\t"
+         "jg L41\n\t"
+         "movl %%esi,%%ecx\n\t"
+         "movl $32,%%ebx\n\t"
+         "jmp L42\n"
+         "L41:\n\t"
+         "shrl $1,%%ecx\n\t"
+         "orl %%eax,%%ecx\n\t"
+         "L42:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "ja L49\n\t"
+         "jmp L43\n\t"
+
+         "L44:\n\t"
+         "pushl %%esi\n\t"
+         "pushl %%eax\n\t"
+         "pushl %%ebx\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%ebp\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "popl %%ecx\n\t"
+         "popl %%ebp\n\t"
+         "popl %%edx\n\t"
+         "popl %%ebx\n\t"
+         "popl %%eax\n\t"
+         "popl %%esi\n\t"
+         "jmp L45\n"
+
+         "L43:\n\t"
+         "popl %%ebp\n\t"
+         : : "D" (p),"d" (pe),"b" (k),"c" (pat),
+           "a" (p3), "S" (hb)
+         );
+#endif
+}
+
 void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
 {
     // First callsite:
@@ -708,292 +959,29 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
     //  - hb = 0x7fffffff
     //  - sval = 1
     //  - 'off' indicates the position of the cleared bit in p1
-    //
-    
-    int i, j, k=0, n=0, done;
-    ulong *p, *pe, *start, *end, pat = 0, p3;
 
-    p3 = sval << 31;
+    movinv32_ctx ctx;
+    ctx.p1 = p1;
+    ctx.lb = lb;
+    ctx.hb = hb;
+    ctx.sval = sval;
+    ctx.off = off;
+
     /* Display the current pattern */
     if (mstr_cpu == me) hprint(LINE_PAT, COL_PAT, p1);
 
-    /* Initialize memory with the initial pattern.  */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 64);
-        pe = start;
-        p = start;
-        done = 0;
-        k = off;
-        pat = p1;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            /* Do a SPINSZ_DWORDS section of memory */
-            /* Original C code replaced with hand tuned assembly code
-             *			while (p <= pe) {
-             *				*p = pat;
-             *				if (++k >= 32) {
-             *					pat = lb;
-             *					k = 0;
-             *				} else {
-             *					pat = pat << 1;
-             *					pat |= sval;
-             *				}
-             *				p++;
-             *			}
-             */
-            asm __volatile__ (
-                              "jmp L20\n\t"
-                              ".p2align 4,,7\n\t"
-                              "L923:\n\t"
-                              "addl $4,%%edi\n\t"
-                              "L20:\n\t"
-                              "movl %%ecx,(%%edi)\n\t"
-                              "addl $1,%%ebx\n\t"
-                              "cmpl $32,%%ebx\n\t"
-                              "jne L21\n\t"
-                              "movl %%esi,%%ecx\n\t"
-                              "xorl %%ebx,%%ebx\n\t"
-                              "jmp L22\n"
-                              "L21:\n\t"
-                              "shll $1,%%ecx\n\t"
-                              "orl %%eax,%%ecx\n\t"
-                              "L22:\n\t"
-                              "cmpl %%edx,%%edi\n\t"
-                              "jb L923\n\t"
-                              : "=b" (k), "=c" (pat)
-                              : "D" (p),"d" (pe),"b" (k),"c" (pat),
-                                "a" (sval), "S" (lb)
-                              );
-            p = pe + 1;
-        } while (!done);
-    }
+    sliced_foreach_segment(&ctx, me, movinv32_init);
+    { BAILR }
 
     /* Do moving inversions test. Check for initial pattern and then
      * write the complement for each memory location. Test from bottom
      * up and then from the top down.  */
-    for (i=0; i<iter; i++) {
-        for (j=0; j<segs; j++) {
-            calculate_chunk(&start, &end, me, j, 64);
-            pe = start;
-            p = start;
-            done = 0;
-            k = off;
-            pat = p1;
-            do {
-                do_tick(me);
-                { BAILR }
+    for (int i=0; i<iter; i++) {
+        sliced_foreach_segment(&ctx, me, movinv32_bottom_up);
+        { BAILR }
 
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
-                if (pe >= end) {
-                    pe = end;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-                /* Original C code replaced with hand tuned assembly code
-                 *				while (1) {
-                 *					if ((bad=*p) != pat) {
-                 *						mt86_error((ulong*)p, pat, bad);
-                 *					}
-                 *					*p = ~pat;
-                 *					if (p >= pe) break;
-                 *					p++;
-                 *
-                 *					if (++k >= 32) {
-                 *						pat = lb;
-                 *						k = 0;
-                 *					} else {
-                 *						pat = pat << 1;
-                 *						pat |= sval;
-                 *					}
-                 *				}
-                 */
-                asm __volatile__ (
-                                  "pushl %%ebp\n\t"
-                                  "jmp L30\n\t"
-                                  ".p2align 4,,7\n\t"
-                                  "L930:\n\t"
-                                  "addl $4,%%edi\n\t"
-                                  "L30:\n\t"
-                                  "movl (%%edi),%%ebp\n\t"
-                                  "cmpl %%ecx,%%ebp\n\t"
-                                  "jne L34\n\t"
-
-                                  "L35:\n\t"
-                                  "notl %%ecx\n\t"
-                                  "movl %%ecx,(%%edi)\n\t"
-                                  "notl %%ecx\n\t"
-                                  "incl %%ebx\n\t"
-                                  "cmpl $32,%%ebx\n\t"
-                                  "jne L31\n\t"
-                                  "movl %%esi,%%ecx\n\t"
-                                  "xorl %%ebx,%%ebx\n\t"
-                                  "jmp L32\n"
-                                  "L31:\n\t"
-                                  "shll $1,%%ecx\n\t"
-                                  "orl %%eax,%%ecx\n\t"
-                                  "L32:\n\t"
-                                  "cmpl %%edx,%%edi\n\t"
-                                  "jb L930\n\t"
-                                  "jmp L33\n\t"
-
-                                  "L34:\n\t" \
-                                  "pushl %%esi\n\t"
-                                  "pushl %%eax\n\t"
-                                  "pushl %%ebx\n\t"
-                                  "pushl %%edx\n\t"
-                                  "pushl %%ebp\n\t"
-                                  "pushl %%ecx\n\t"
-                                  "pushl %%edi\n\t"
-                                  "call mt86_error\n\t"
-                                  "popl %%edi\n\t"
-                                  "popl %%ecx\n\t"
-                                  "popl %%ebp\n\t"
-                                  "popl %%edx\n\t"
-                                  "popl %%ebx\n\t"
-                                  "popl %%eax\n\t"
-                                  "popl %%esi\n\t"
-                                  "jmp L35\n"
-
-                                  "L33:\n\t"
-                                  "popl %%ebp\n\t"
-                                  : "=b" (k),"=c" (pat)
-                                  : "D" (p),"d" (pe),"b" (k),"c" (pat),
-                                    "a" (sval), "S" (lb)
-                                  );
-                p = pe + 1;
-            } while (!done);
-        }
-
-        if (--k < 0) {
-            k = 31;
-        }
-        for (pat = lb, n = 0; n < k; n++) {
-            pat = pat << 1;
-            pat |= sval;
-        }
-        k++;
-
-        for (j=segs-1; j>=0; j--) {
-            calculate_chunk(&start, &end, me, j, 64);
-            p = end;
-            pe = end;
-            done = 0;
-            do {
-                do_tick(me);
-                { BAILR }
-
-                /* Check for underflow */
-                if (pe - SPINSZ_DWORDS < pe && pe != 0) {
-                    pe -= SPINSZ_DWORDS;
-                } else {
-                    pe = start;
-                    done++;
-                }
-                /* We need this redundant check because we are
-                 * using unsigned longs for the address.
-                 */
-                if (pe < start || pe > end) {
-                    pe = start;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-                /* Original C code replaced with hand tuned assembly code
-                 *				while(1) {
-                 *					if ((bad=*p) != ~pat) {
-                 *						mt86_error((ulong*)p, ~pat, bad);
-                 *					}
-                 *					*p = pat;
-                 *                                      if (p >= pe) break;
-                 *                                      p++;
-                 *					if (--k <= 0) {
-                 *						pat = hb;
-                 *						k = 32;
-                 *					} else {
-                 *						pat = pat >> 1;
-                 *						pat |= p3;
-                 *					}
-                 *				};
-                 */
-                asm __volatile__ (
-                                  "pushl %%ebp\n\t"
-                                  "jmp L40\n\t"
-                                  ".p2align 4,,7\n\t"
-                                  "L49:\n\t"
-                                  "subl $4,%%edi\n\t"
-                                  "L40:\n\t"
-                                  "movl (%%edi),%%ebp\n\t"
-                                  "notl %%ecx\n\t"
-                                  "cmpl %%ecx,%%ebp\n\t"
-                                  "jne L44\n\t"
-
-                                  "L45:\n\t"
-                                  "notl %%ecx\n\t"
-                                  "movl %%ecx,(%%edi)\n\t"
-                                  "decl %%ebx\n\t"
-                                  "cmpl $0,%%ebx\n\t"
-                                  "jg L41\n\t"
-                                  "movl %%esi,%%ecx\n\t"
-                                  "movl $32,%%ebx\n\t"
-                                  "jmp L42\n"
-                                  "L41:\n\t"
-                                  "shrl $1,%%ecx\n\t"
-                                  "orl %%eax,%%ecx\n\t"
-                                  "L42:\n\t"
-                                  "cmpl %%edx,%%edi\n\t"
-                                  "ja L49\n\t"
-                                  "jmp L43\n\t"
-
-                                  "L44:\n\t" \
-                                  "pushl %%esi\n\t"
-                                  "pushl %%eax\n\t"
-                                  "pushl %%ebx\n\t"
-                                  "pushl %%edx\n\t"
-                                  "pushl %%ebp\n\t"
-                                  "pushl %%ecx\n\t"
-                                  "pushl %%edi\n\t"
-                                  "call mt86_error\n\t"
-                                  "popl %%edi\n\t"
-                                  "popl %%ecx\n\t"
-                                  "popl %%ebp\n\t"
-                                  "popl %%edx\n\t"
-                                  "popl %%ebx\n\t"
-                                  "popl %%eax\n\t"
-                                  "popl %%esi\n\t"
-                                  "jmp L45\n"
-
-                                  "L43:\n\t"
-                                  "popl %%ebp\n\t"
-                                  : "=b" (k), "=c" (pat)
-                                  : "D" (p),"d" (pe),"b" (k),"c" (pat),
-                                    "a" (p3), "S" (hb)
-                                  );
-                p = pe - 1;
-            } while (!done);
-        }
+        sliced_foreach_segment(&ctx, me, movinv32_top_down);
+        { BAILR }
     }
 }
 
@@ -1100,16 +1088,26 @@ void movsl(ulong* dest,
          );
 }
 
+ulong block_move_normalize_len_dw(ulong len_dw) {
+    // The block_move test works with sets of 64-byte blocks,
+    // so ensure our total length is a multiple of 64.
+    //
+    // In fact, since we divide the region in half, and each half-region
+    // is a set of 64-byte blocks, the full region should be a multiple of 128
+    // bytes.
+    //
+    // Note that there's no requirement for the start address of the region to
+    // be 64-byte aligned, it can be any dword.
+    return (len_dw >> 5) << 5;
+}
+
 void block_move_init(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
     // p is the start address for the current segment.
 
-    // Compute 'len' in units of 64-byte cache lines:
-    ulong len  = len_dw / 16;
-    ASSERT((len * 16) == len_dw);
-
-    // Confirm we have an even number of cache lines,
-    // since we're about to divide the region in half.
-    ASSERT(0 == (len & 1));
+    len_dw = block_move_normalize_len_dw(len_dw);
+    
+    // Compute 'len' in units of 64-byte chunks:
+    ulong len = len_dw >> 4;
 
     // We only need to initialize len/2, since we'll just copy
     // the first half onto the second half in the move step.
@@ -1163,11 +1161,12 @@ void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
     ulong iter = ctx->iter;
     int me = ctx->me;
 
+    len_dw = block_move_normalize_len_dw(len_dw);
+
     /* Now move the data around 
      * First move the data up half of the segment size we are testing
      * Then move the data to the original location + 32 bytes
      */
-
     ulong half_len_dw = len_dw / 2; // Half the size of this block in DWORDS
     ulong* pp = p + half_len_dw;    // VA at mid-point of this block.
     for (int i=0; i<iter; i++) {
@@ -1196,6 +1195,8 @@ void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
 }
 
 void block_move_check(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
+    len_dw = block_move_normalize_len_dw(len_dw);
+
     /* Now check the data.
      * This is rather crude, we just check that the
      * adjacent words are the same.
