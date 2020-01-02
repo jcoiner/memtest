@@ -67,19 +67,30 @@ int main() {
 
     const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 512;
 
-    segs = 1;
-    ulong start = (ulong)malloc(kTestSizeDwords * sizeof(ulong));
-    ulong end = start + kTestSizeDwords * sizeof(ulong);
+    // Allocate an extra cache line on each end, where we'll
+    // write a sentinel pattern to detect overflow or underflow:
+    const int kRawBufSizeDwords = kTestSizeDwords + 32;
 
-    // align 'start' to a cache line:
-    if (start & 0x3f) {
-        start &= ~0x3f;
-        start += 0x40;
+    segs = 1;
+    ulong raw_start = (ulong)malloc(kRawBufSizeDwords * sizeof(ulong));
+    ulong raw_end = raw_start + kRawBufSizeDwords * sizeof(ulong);
+
+    // align to a cache line:
+    if (raw_start & 0x3f) {
+        raw_start &= ~0x3f;
+        raw_start += 0x40;
     }
-    // align 'end' to a cache line:
-    if (end & 0x3f) {
-        end &= ~0x3f;
+    // align to a cache line:
+    if (raw_end & 0x3f) {
+        raw_end &= ~0x3f;
     }
+
+    ulong start = raw_start + 64; // exclude low sentinel cache line
+    ulong end   = raw_end   - 64; // exclude high sentinel cache line
+
+    // setup sentinels
+    memset((ulong*)raw_start, 'z', 64);
+    memset((ulong*)end, 'z', 64);
 
     vv->map[0].start = (ulong*)start;
     vv->map[0].end = ((ulong*)end) - 1;  // map.end points to xxxxxfc
@@ -119,6 +130,12 @@ int main() {
     vv->map[0].end   = (ulong*)0xfffffffc;
     movinv1(iter, pat, ~pat, 0);
 #endif
+
+    // Check sentinels, they should not have been overwritten. Do this last.
+    for (int j=0; j<64; j++) {
+        assert(((char*)raw_start)[j] == 'z');
+        assert(((char*)end)[j]       == 'z');
+    }
 
     return 0;
 }

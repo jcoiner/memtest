@@ -989,11 +989,13 @@ typedef struct {
     ulong p2;
 } modtst_ctx;
 
-void modtst_sparse_writes(ulong* restrict start, ulong len_dw, const void* vctx) {
+void modtst_sparse_writes(ulong* restrict start,
+                          ulong len_dw, const void* vctx) {
     const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
     ulong p1 = ctx->p1;
+    ulong offset = ctx->offset;
 
-    for (ulong i = ctx->offset; i < len_dw; i += MOD_SZ) {
+    for (ulong i = offset; i < len_dw; i += MOD_SZ) {
         start[i] = p1;
     }
 }
@@ -1004,22 +1006,28 @@ void modtst_dense_writes(ulong* restrict start, ulong len_dw,
     ulong p2 = ctx->p2;
     ulong offset = ctx->offset;
 
-    ASSERT(ctx->offset < MOD_SZ);
+    ASSERT(offset < MOD_SZ);
 
+    ulong k = 0;
     for (ulong i = 0; i < len_dw; i++) {
-        if ((i % MOD_SZ) != offset)
+        if (k != offset) {
             start[i] = p2;
+        }
+        if (++k >= MOD_SZ) {
+            k = 0;
+        }
     }
 }
 
 void modtst_check(ulong* restrict start, ulong len_dw, const void* vctx) {
     const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
     ulong p1 = ctx->p1;
+    ulong offset = ctx->offset;
 
-    ASSERT(ctx->offset < MOD_SZ);
+    ASSERT(offset < MOD_SZ);
 
     ulong bad;
-    for (ulong i = ctx->offset; i < len_dw; i += MOD_SZ) {
+    for (ulong i = offset; i < len_dw; i += MOD_SZ) {
         if ((bad = start[i]) != p1)
             mt86_error(start + i, p1, bad);
     }
@@ -1138,6 +1146,8 @@ typedef struct {
 
 void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
     const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
+    ulong iter = ctx->iter;
+    int me = ctx->me;
 
     /* Now move the data around 
      * First move the data up half of the segment size we are testing
@@ -1146,11 +1156,11 @@ void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
 
     ulong half_len_dw = len_dw / 2; // Half the size of this block in DWORDS
     ulong* pp = p + half_len_dw;    // VA at mid-point of this block.
-    for (int i=0; i<ctx->iter; i++) {
+    for (int i=0; i<iter; i++) {
         if (i > 0) {
             // foreach_segment() called this before the 0th iteration,
             // so don't tick twice in quick succession.
-            do_tick(ctx->me);
+            do_tick(me);
         }
         { BAILR }
 
@@ -1215,9 +1225,10 @@ typedef struct {
 
 void bit_fade_fill_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
     const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
+    ulong pat = ctx->pat;
 
     for (ulong i = 0; i < len_dw; i++) {
-        p[i] = ctx->pat;
+        p[i] = pat;
     }
 }
 
@@ -1237,11 +1248,12 @@ void bit_fade_fill(ulong p1, int me)
 
 void bit_fade_chk_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
     const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
+    ulong pat = ctx->pat;
 
     for (ulong i = 0; i < len_dw; i++) {
         ulong bad;
-        if ((bad=p[i]) != ctx->pat) {
-            mt86_error(p+i, ctx->pat, bad);
+        if ((bad=p[i]) != pat) {
+            mt86_error(p+i, pat, bad);
         }
     }
 }
