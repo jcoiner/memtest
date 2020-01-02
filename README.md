@@ -12,15 +12,12 @@ Non-goals of this fork:
 
 ## TODO
 
- - unit test foreach_segment
+ - Unit test foreach_segment
 
- - apply foreach_segment to more tests
+ - Review addr_tst1, is it safe? can we add asserts
+   or use foreach _segment?
 
- - cover all test routines in self_test
-
- - call self_test from the Makefile
-
- - DEBUGF needs a stub printf definition in the prod binary
+ - Call self_test from the Makefile
 
  - Apply the rest of the ubuntu/debian patches.
    Get in touch with maintainers...
