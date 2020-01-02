@@ -12,8 +12,8 @@ FDISK=/dev/fd0
 AS=as -32
 CC=gcc
 
-CFLAGS= -Wall -Werror -march=i486 -m32 -O1 -fomit-frame-pointer -fno-builtin \
-	-ffreestanding -fPIC $(SMP_FL) -fno-stack-protector -g
+CFLAGS= -Wall -Werror -march=i486 -m32 -O2 -fomit-frame-pointer -fno-builtin \
+	-ffreestanding -fPIC $(SMP_FL) -fno-stack-protector
 
 SELF_TEST_CFLAGS = -Wall -Werror -march=i486 -m32 -O1 -g
 

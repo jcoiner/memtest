@@ -983,15 +983,57 @@ void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
     }
 }
 
+typedef struct {
+    int offset;
+    ulong p1;
+    ulong p2;
+} modtst_ctx;
+
+void modtst_sparse_writes(ulong* restrict start, ulong len_dw, const void* vctx) {
+    const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
+    ulong p1 = ctx->p1;
+
+    for (ulong i = ctx->offset; i < len_dw; i += MOD_SZ) {
+        start[i] = p1;
+    }
+}
+
+void modtst_dense_writes(ulong* restrict start, ulong len_dw,
+                         const void* vctx) {
+    const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
+    ulong p2 = ctx->p2;
+    ulong offset = ctx->offset;
+
+    ASSERT(ctx->offset < MOD_SZ);
+
+    for (ulong i = 0; i < len_dw; i++) {
+        if ((i % MOD_SZ) != offset)
+            start[i] = p2;
+    }
+}
+
+void modtst_check(ulong* restrict start, ulong len_dw, const void* vctx) {
+    const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
+    ulong p1 = ctx->p1;
+
+    ASSERT(ctx->offset < MOD_SZ);
+
+    ulong bad;
+    for (ulong i = ctx->offset; i < len_dw; i += MOD_SZ) {
+        if ((bad = start[i]) != p1)
+            mt86_error(start + i, p1, bad);
+    }
+}
+
 /*
  * Test all of memory using modulo X access pattern.
  */
 void modtst(int offset, int iter, ulong p1, ulong p2, int me)
 {
-    int j, k, l, done;
-    ulong *p;
-    ulong *pe;
-    ulong *start, *end;
+    modtst_ctx ctx;
+    ctx.offset = offset;
+    ctx.p1 = p1;
+    ctx.p2 = p2;
 
     /* Display the current pattern */
     if (mstr_cpu == me) {
@@ -1001,175 +1043,17 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     }
 
     /* Write every nth location with pattern */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 4);
-        end -= MOD_SZ;	/* adjust the ending address */
-        pe = (ulong *)start;
-        p = start+offset;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            /* Original C code replaced with hand tuned assembly code
-             *			for (; p <= pe; p += MOD_SZ) {
-             *				*p = p1;
-             *			}
-             */
-            asm __volatile__ (
-                              "jmp L60\n\t" \
-                              ".p2align 4,,7\n\t" \
-
-                              "L60:\n\t" \
-                              "movl %%eax,(%%edi)\n\t" \
-                              "addl $80,%%edi\n\t" \
-                              "cmpl %%edx,%%edi\n\t" \
-                              "jb L60\n\t" \
-                              : "=D" (p)
-                              : "D" (p), "d" (pe), "a" (p1)
-                              );
-        } while (!done);
-    }
+    sliced_foreach_segment(&ctx, me, modtst_sparse_writes);
+    { BAILR }
 
     /* Write the rest of memory "iter" times with the pattern complement */
-    for (l=0; l<iter; l++) {
-        for (j=0; j<segs; j++) {
-            calculate_chunk(&start, &end, me, j, 4);
-            pe = (ulong *)start;
-            p = start;
-            done = 0;
-            k = 0;
-            do {
-                do_tick(me);
-                { BAILR }
-
-                /* Check for overflow */
-                if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                    pe += SPINSZ_DWORDS;
-                } else {
-                    pe = end;
-                }
-                if (pe >= end) {
-                    pe = end;
-                    done++;
-                }
-                if (p == pe ) {
-                    break;
-                }
-                /* Original C code replaced with hand tuned assembly code
-                 *				for (; p <= pe; p++) {
-                 *					if (k != offset) {
-                 *						*p = p2;
-                 *					}
-                 *					if (++k > MOD_SZ-1) {
-                 *						k = 0;
-                 *					}
-                 *				}
-                 */
-                asm __volatile__ (
-                                  "jmp L50\n\t" \
-                                  ".p2align 4,,7\n\t" \
-
-                                  "L54:\n\t" \
-                                  "addl $4,%%edi\n\t" \
-                                  "L50:\n\t" \
-                                  "cmpl %%ebx,%%ecx\n\t" \
-                                  "je L52\n\t" \
-                                  "movl %%eax,(%%edi)\n\t" \
-                                  "L52:\n\t" \
-                                  "incl %%ebx\n\t" \
-                                  "cmpl $19,%%ebx\n\t" \
-                                  "jle L53\n\t" \
-                                  "xorl %%ebx,%%ebx\n\t" \
-                                  "L53:\n\t" \
-                                  "cmpl %%edx,%%edi\n\t" \
-                                  "jb L54\n\t" \
-                                  : "=b" (k)
-                                  : "D" (p), "d" (pe), "a" (p2),
-                                    "b" (k), "c" (offset)
-                                  );
-                p = pe + 1;
-            } while (!done);
-        }
+    for (ulong i=0; i<iter; i++) {
+        sliced_foreach_segment(&ctx, me, modtst_dense_writes);
+        { BAILR }
     }
 
     /* Now check every nth location */
-    for (j=0; j<segs; j++) {
-        calculate_chunk(&start, &end, me, j, 4);
-        pe = (ulong *)start;
-        p = start+offset;
-        done = 0;
-        end -= MOD_SZ;	/* adjust the ending address */
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            /* Original C code replaced with hand tuned assembly code
-             *			for (; p <= pe; p += MOD_SZ) {
-             *				if ((bad=*p) != p1) {
-             *					mt86_error((ulong*)p, p1, bad);
-             *				}
-             *			}
-             */
-            asm __volatile__ (
-                              "jmp L70\n\t" \
-                              ".p2align 4,,7\n\t" \
-
-                              "L70:\n\t" \
-                              "movl (%%edi),%%ecx\n\t" \
-                              "cmpl %%eax,%%ecx\n\t" \
-                              "jne L71\n\t" \
-                              "L72:\n\t" \
-                              "addl $80,%%edi\n\t" \
-                              "cmpl %%edx,%%edi\n\t" \
-                              "jb L70\n\t" \
-                              "jmp L73\n\t" \
-
-                              "L71:\n\t" \
-                              "pushl %%edx\n\t"
-                              "pushl %%ecx\n\t"
-                              "pushl %%eax\n\t"
-                              "pushl %%edi\n\t"
-                              "call mt86_error\n\t"
-                              "popl %%edi\n\t"
-                              "popl %%eax\n\t"
-                              "popl %%ecx\n\t"
-                              "popl %%edx\n\t"
-                              "jmp L72\n"
-
-                              "L73:\n\t" \
-                              : "=D" (p)
-                              : "D" (p), "d" (pe), "a" (p1)
-                              : "ecx"
-                              );
-        } while (!done);
-    }
+    sliced_foreach_segment(&ctx, me, modtst_check);
 }
 
 void movsl(ulong* dest,
@@ -1194,7 +1078,7 @@ void movsl(ulong* dest,
          );
 }
 
-void block_move_init(ulong* p, ulong len_dw, const void* unused_ctx) {
+void block_move_init(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
     // p is the start address for the current segment.
 
     // Compute 'len' in units of 64-byte cache lines:
@@ -1252,8 +1136,8 @@ typedef struct {
     int me;
 } block_move_ctx;
 
-void block_move_move(ulong* p, ulong len_dw, const void* vctx) {
-    const block_move_ctx* ctx = (const block_move_ctx*)vctx;
+void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
+    const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
 
     /* Now move the data around 
      * First move the data up half of the segment size we are testing
@@ -1287,7 +1171,7 @@ void block_move_move(ulong* p, ulong len_dw, const void* vctx) {
     }
 }
 
-void block_move_check(ulong* p, ulong len_dw, const void* unused_ctx) {
+void block_move_check(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
     /* Now check the data.
      * This is rather crude, we just check that the
      * adjacent words are the same.
@@ -1310,7 +1194,7 @@ void block_move(int iter, int me)
     block_move_ctx ctx;
     ctx.iter = iter;
     ctx.me = me;
-    
+
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
     { BAILR }
@@ -1329,8 +1213,8 @@ typedef struct {
     ulong pat;
 } bit_fade_ctx;
 
-void bit_fade_fill_seg(ulong* p, ulong len_dw, const void* vctx) {
-    const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
+void bit_fade_fill_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
+    const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
 
     for (ulong i = 0; i < len_dw; i++) {
         p[i] = ctx->pat;
@@ -1351,8 +1235,8 @@ void bit_fade_fill(ulong p1, int me)
     unsliced_foreach_segment(&ctx, me, bit_fade_fill_seg);
 }
 
-void bit_fade_chk_seg(ulong* p, ulong len_dw, const void* vctx) {
-    const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
+void bit_fade_chk_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
+    const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
 
     for (ulong i = 0; i < len_dw; i++) {
         ulong bad;

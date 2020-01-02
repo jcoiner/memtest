@@ -102,6 +102,9 @@ int main() {
     // TEST 9
     movinvr(me);
 
+    // TEST 10
+    modtst(2, 1, 0x5555aaaa, 0xaaaa5555, me);
+
     // TEST 11
     bit_fade_fill(0xdeadbeef, me);
     bit_fade_chk(0xdeadbeef, me);
