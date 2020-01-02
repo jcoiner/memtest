@@ -695,6 +695,21 @@ void movinv1 (int iter, ulong p1, ulong p2, int me)
 
 void movinv32(int iter, ulong p1, ulong lb, ulong hb, int sval, int off,int me)
 {
+    // First callsite:
+    //  - p1 has 1 bit set (somewhere)
+    //  - lb = 1 ("low bit")
+    //  - hb = 0x80000000 ("high bit")
+    //  - sval = 0
+    //  - 'off' indicates the position of the set bit in p1
+    //
+    // Second callsite is the same, but inverted:
+    //  - p1 has 1 bit clear (somewhere)
+    //  - lb = 0xfffffffe
+    //  - hb = 0x7fffffff
+    //  - sval = 1
+    //  - 'off' indicates the position of the cleared bit in p1
+    //
+    
     int i, j, k=0, n=0, done;
     ulong *p, *pe, *start, *end, pat = 0, p3;
 

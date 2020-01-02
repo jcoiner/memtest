@@ -944,12 +944,12 @@ int do_test(int my_ord)
         for (i=0, p1=1; p1; p1=p1<<1, i++) {
             s_barrier();
             movinv32(c_iter,p1, 1, 0x80000000, 0, i, my_ord);
-            BAILOUT
-                s_barrier();
+            { BAILOUT }
+            s_barrier();
             movinv32(c_iter,~p1, 0xfffffffe,
                      0x7fffffff, 1, i, my_ord);
-            BAILOUT
-		}
+            { BAILOUT }
+        }
         break;
 
     case 9: /* Random Data Sequence (test #9) */

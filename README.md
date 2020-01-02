@@ -1,7 +1,7 @@
 # memtest
 
-Fork of memtest86+ 5.01. Improves correctness, code health, and code readability
-while maintaining the performance and coverage at levels at least as good as 5.01.
+Fork of memtest86+ 5.01. Improves its correctness, code health, and code
+readability while doing no harm to performance and coverage.
 
 Non-goals of this fork:
  - Support UEFI
