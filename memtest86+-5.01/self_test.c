@@ -61,14 +61,9 @@ void mt86_error(ulong* adr, ulong good, ulong bad) {
 
 int main() {
     memset(&variables, 0, sizeof(variables));
-
-    int stack_var;
-    int* heap_var = malloc(sizeof(int));
-    printf("Stack = %p, heap = %p\n", &stack_var, heap_var);
-    free(heap_var);
+    vv->debugging = 1;
 
     get_cpuid();
-    vv->debugging = 1;
 
     const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 512;
 
@@ -106,6 +101,10 @@ int main() {
 
     // TEST 9
     movinvr(me);
+
+    // TEST 11
+    bit_fade_fill(0xdeadbeef, me);
+    bit_fade_chk(0xdeadbeef, me);
 
 #if 0
     // TODO: test the foreach routines with boundary address near 4G

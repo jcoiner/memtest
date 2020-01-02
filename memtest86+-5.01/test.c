@@ -1325,90 +1325,50 @@ void block_move(int iter, int me)
     sliced_foreach_segment(&ctx, me, block_move_check);
 }
 
+typedef struct {
+    ulong pat;
+} bit_fade_ctx;
+
+void bit_fade_fill_seg(ulong* p, ulong len_dw, const void* vctx) {
+    const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
+
+    for (ulong i = 0; i < len_dw; i++) {
+        p[i] = ctx->pat;
+    }
+}
+
 /*
  * Test memory for bit fade, fill memory with pattern.
  */
 void bit_fade_fill(ulong p1, int me)
 {
-    int j, done;
-    ulong *p, *pe;
-    ulong *start,*end;
-
     /* Display the current pattern */
     hprint(LINE_PAT, COL_PAT, p1);
 
     /* Initialize memory with the initial pattern.  */
-    for (j=0; j<segs; j++) {
-        start = vv->map[j].start;
-        end = vv->map[j].end;
-        pe = (ulong *)start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
+    bit_fade_ctx ctx;
+    ctx.pat = p1;
+    unsliced_foreach_segment(&ctx, me, bit_fade_fill_seg);
+}
 
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            for (; p < pe;) {
-                *p = p1;
-                p++;
-            }
-            p = pe + 1;
-        } while (!done);
+void bit_fade_chk_seg(ulong* p, ulong len_dw, const void* vctx) {
+    const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
+
+    for (ulong i = 0; i < len_dw; i++) {
+        ulong bad;
+        if ((bad=p[i]) != ctx->pat) {
+            mt86_error(p+i, ctx->pat, bad);
+        }
     }
 }
 
 void bit_fade_chk(ulong p1, int me)
 {
-    int j, done;
-    ulong *p, *pe, bad;
-    ulong *start,*end;
+    bit_fade_ctx ctx;
+    ctx.pat = p1;
 
     /* Make sure that nothing changed while sleeping */
-    for (j=0; j<segs; j++) {
-        start = vv->map[j].start;
-        end = vv->map[j].end;
-        pe = (ulong *)start;
-        p = start;
-        done = 0;
-        do {
-            do_tick(me);
-            { BAILR }
-
-            /* Check for overflow */
-            if (pe + SPINSZ_DWORDS > pe && pe != 0) {
-                pe += SPINSZ_DWORDS;
-            } else {
-                pe = end;
-            }
-            if (pe >= end) {
-                pe = end;
-                done++;
-            }
-            if (p == pe ) {
-                break;
-            }
-            for (; p < pe;) {
-                if ((bad=*p) != p1) {
-                    mt86_error((ulong*)p, p1, bad);
-                }
-                p++;
-            }
-            p = pe + 1;
-        } while (!done);
-    }
+    unsliced_foreach_segment(&ctx, me, bit_fade_chk_seg);
 }
 
 /* Sleep for N seconds */
