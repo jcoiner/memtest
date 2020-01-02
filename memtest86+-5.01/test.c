@@ -80,10 +80,6 @@ void calculate_chunk(ulong** start, ulong** end, int me,
     }
 }
 
-typedef void(*segment_fn)(ulong* start,  // start address
-                          ulong len_dw,  // length of segment in dwords
-                          const void* ctx);  // any context data needed
-
 /* Call segment_fn() for each up-to-SPINSZ segment between
  * 'start' and 'end'.
  */
@@ -99,8 +95,9 @@ void foreach_segment
     ASSERT(0x3c == (((ulong)end)   & 0x3f));
 
     // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
+    //
     // To avoid overflow in our loop tests and length calculations,
-    // use dword indices (the '_dw' vars) to avoid overflow.
+    // use dword indices (the '_dw' vars) to avoid overflows.
     ulong start_dw = ((ulong)start) >> 2;
     ulong   end_dw = ((ulong)  end) >> 2;
 
@@ -116,7 +113,7 @@ void foreach_segment
         do_tick(me);
         { BAILR }
 
-        // ensure no overflow on add
+        // ensure no overflow
         ASSERT((seg_end_dw + SPINSZ_DWORDS) > seg_end_dw);
         seg_end_dw += SPINSZ_DWORDS;
 
@@ -128,7 +125,6 @@ void foreach_segment
             break;
         }
 
-        // ensure no overflow on subtract
         ASSERT(seg_end_dw > seg_dw);
         ulong seg_len_dw = seg_end_dw - seg_dw;
 

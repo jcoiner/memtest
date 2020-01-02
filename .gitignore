@@ -6,3 +6,4 @@
 memtest
 self_test
 memtest_shared
+run_self_test

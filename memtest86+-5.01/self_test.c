@@ -59,6 +59,65 @@ void mt86_error(ulong* adr, ulong good, ulong bad) {
     assert(0);
 }
 
+typedef struct {
+    ulong* va;
+    ulong len_dw;
+} foreach_chunk;
+
+#define MAX_CHUNK 16
+
+typedef struct {
+    foreach_chunk chunks[MAX_CHUNK];
+    int index;
+} foreach_ctx;
+
+void record_chunks(ulong* va, ulong len_dw, const void* vctx) {
+    foreach_ctx* ctx = (foreach_ctx*)vctx;
+
+    ctx->chunks[ctx->index].va = va;
+    ctx->chunks[ctx->index].len_dw = len_dw;
+    ctx->index++;
+}
+
+void foreach_tests() {
+    foreach_ctx ctx;
+    const int me = 0;
+
+    // mapped segment is 3G to 4G exact
+    memset(&ctx, 0, sizeof(ctx));
+    foreach_segment((ulong*)0xc0000000,
+                    (ulong*)0xfffffffc, me, &ctx, record_chunks);
+
+    assert(ctx.index == 4);
+    assert(ctx.chunks[0].va     == (ulong*)0xc0000000);
+    assert(ctx.chunks[0].len_dw == SPINSZ_DWORDS);
+    assert(ctx.chunks[1].va     == (ulong*)0xd0000000);
+    assert(ctx.chunks[1].len_dw == SPINSZ_DWORDS);
+    assert(ctx.chunks[2].va     == (ulong*)0xe0000000);
+    assert(ctx.chunks[2].len_dw == SPINSZ_DWORDS);
+    assert(ctx.chunks[3].va     == (ulong*)0xf0000000);
+    assert(ctx.chunks[3].len_dw == SPINSZ_DWORDS);
+
+    // mapped segment is 256 bytes, 128 byte aligned
+    memset(&ctx, 0, sizeof(ctx));
+    foreach_segment((ulong*)0xc0000080,
+                    (ulong*)0xc000017c, me, &ctx, record_chunks);
+    assert(ctx.index == 1);
+    assert(ctx.chunks[0].va == (ulong*)0xc0000080);
+    assert(ctx.chunks[0].len_dw == 64);
+
+    // mapped segment starts a bit below 3.75G
+    // and goes up to the 4G boundary
+    memset(&ctx, 0, sizeof(ctx));
+    foreach_segment((ulong*)0xeffff800,
+                    (ulong*)0xfffffffc, me, &ctx, record_chunks);
+    assert(ctx.index == 2);
+    assert(ctx.chunks[0].va == (ulong*)0xeffff800);
+    assert(ctx.chunks[0].len_dw == SPINSZ_DWORDS);
+    assert(ctx.chunks[1].va == (ulong*)0xfffff800);
+    assert(ctx.chunks[1].len_dw == 0x200);
+}
+
 int main() {
     memset(&variables, 0, sizeof(variables));
     vv->debugging = 1;
@@ -98,6 +157,9 @@ int main() {
     const int iter = 2;
     const int me = 0;  // cpu ordinal
 
+    foreach_tests();
+
+    
     // TEST 0
     // NOTE: in prod, this runs with cache disabled
     //       but we can't do anything about the cache in userspace.
@@ -126,22 +188,14 @@ int main() {
     bit_fade_fill(0xdeadbeef, me);
     bit_fade_chk(0xdeadbeef, me);
 
-#if 0
-    // TODO: test the foreach routines with boundary address near 4G
-    //
-    // We can't malloc up there (it's where linux puts the stack)
-    // but we can invent VAs up there so long as we don't attempt to access
-    // them.
-    vv->map[0].start = (ulong*)0xe0000000;
-    vv->map[0].end   = (ulong*)0xfffffffc;
-    movinv1(iter, pat, ~pat, 0);
-#endif
 
     // Check sentinels, they should not have been overwritten. Do this last.
     for (int j=0; j<64; j++) {
         assert(((char*)raw_start)[j] == 'z');
         assert(((char*)end)[j]       == 'z');
     }
+
+    printf("All self-tests PASS.\n");
 
     return 0;
 }

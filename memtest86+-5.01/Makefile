@@ -23,7 +23,10 @@ OBJS= head.o reloc.o main.o test.o init.o lib.o patn.o screen_buffer.o \
 
 SELF_TEST_OBJS = test.o self_test.o cpuid.o random.o
 
-all: clean memtest.bin memtest self_test
+all: memtest.bin memtest self_test run_self_test
+
+run_self_test : self_test
+	./self_test && touch run_self_test
 
 # Link it statically once so I know I don't have undefined
 # symbols and then link it dynamically so I have full

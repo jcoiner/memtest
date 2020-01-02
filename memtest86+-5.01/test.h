@@ -192,6 +192,15 @@ void bit_fade_chk(unsigned long n, int cpu);
 void find_ticks_for_pass(void);
 void beep(unsigned int frequency);
 
+// Expose foreach_segment here for self_test, otherwise
+// it would be local to test.c:
+typedef void(*segment_fn)(ulong* start,  // start address
+                          ulong len_dw,  // length of segment in dwords
+                          const void* ctx);  // any context data needed
+void foreach_segment(ulong* start, ulong* end,
+                     int me, const void* ctx, segment_fn func);
+
+
 // In self-test, DEBUGF wraps libc's printf.
 // In memtest standalone, printf will be a stub
 // and 'vv->debugging' is false to avoid call overhead.

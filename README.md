@@ -12,12 +12,8 @@ Non-goals of this fork:
 
 ## TODO
 
- - Unit test foreach_segment
-
  - Review addr_tst1, is it safe? can we add asserts
    or use foreach _segment?
-
- - Call self_test from the Makefile
 
  - Apply the rest of the ubuntu/debian patches.
    Get in touch with maintainers...
