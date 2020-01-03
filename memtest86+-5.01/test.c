@@ -1054,10 +1054,13 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
     //
     // Note that there's no requirement for the start address of the region to
     // be 64-byte aligned, it can be any dword.
-    return (len_dw >> 5) << 5;
+    ulong result = (len_dw >> 5) << 5;
+    ASSERT(result > 0);
+    return result;
 }
 
-void block_move_init(ulong* restrict buf, ulong len_dw, const void* unused_ctx) {
+void block_move_init(ulong* restrict buf,
+                     ulong len_dw, const void* unused_ctx) {
     len_dw = block_move_normalize_len_dw(len_dw);
 
     // Compute 'len' in units of 64-byte chunks:
@@ -1133,10 +1136,6 @@ void block_move_move(ulong* restrict buf,
             do_tick(me);
         }
         { BAILR }
-
-        // p == block start
-        // pp == midpoint
-        // pe == block end
 
         // Move first half to 2nd half:
         movsl(/*dest=*/ mid, /*src=*/ buf, half_len_dw);

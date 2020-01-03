@@ -116,6 +116,14 @@ void foreach_tests() {
     assert(ctx.chunks[0].len_dw == SPINSZ_DWORDS);
     assert(ctx.chunks[1].va == (ulong*)0xfffff800);
     assert(ctx.chunks[1].len_dw == 0x200);
+
+    // mapped segment is 0 to 32M
+    memset(&ctx, 0, sizeof(ctx));
+    foreach_segment((ulong*)0x0,
+                    (ulong*)0x1fffffc, me, &ctx, record_chunks);
+    assert(ctx.index == 1);
+    assert(ctx.chunks[0].va == (ulong*)0x0);
+    assert(ctx.chunks[0].len_dw == 0x800000);
 }
 
 int main() {
