@@ -17,60 +17,54 @@ Non-goals of this fork:
  - Apply the rest of the ubuntu/debian patches.
    Get in touch with distro maintainers. what's the next step?
 
+ - Why won't it start up on the thinkpad T400?
+
  - Test SMP a little bit, ensure it's not borked. Getting SMP fully
    stable is not a goal but let's not make it worse.
 
- - Update the version number to 6.0. (Where does the 5.01 print from??)
+ - Update the version number to 6.0. Where does the 5.01 print from?
 
 ## Changes since 5.01
 
- - Specify units on major APIs, data structures, and magic-number
-   macros. Use comments and naming to clarify whether a given
-   integer represents a physical address, virtual address,
-   dword index, cache line index, 4k page number, etc.
+ - Specify units on major APIs, data structures, and shared constants.
+   Never again wonder whether a given integer is a VA, PA, byte address,
+   dword index, 4k page index, and so on.
 
- - Add an ASSERT() macro for testing assumptions and catching coding
-   bugs. Prints a message in yellow (not red) since assertion failures
-   are not usually memory errors.
+ - Add an ASSERT() macro for validating assumptions. Prints a message
+   in yellow (not red) to distinguish asserts from memory errors.
 
- - Add a usermode self_test. This is not a memory test, it's a unit test
-   for the core memtest86+ routines in test.c. This allows running them
-   in gdb, or adding debug prints. Prod code can use the DEBUGF macro
-   to print messages in the self_test.
+ - Add a unit test for the core memtest86+ routines in test.c. The
+   "self_test" allows running these routines in gdb or adding debug
+   prints. Prod code can use the DEBUGF macro to print messages.
 
-   The unit test is a work in progress, it does not yet support SMP or
-   error injection. It does cover all the major test routines. Like
-   memtest86+ proper, the unit test is a 32-bit binary. Unlike memtest86+
-   the self test needs libc, so you will need a 32-bit libc installed.
+   The unit test does not yet support SMP or error injection. It does
+   cover all the major test routines. You need a 32-bit libc (sorry.)
 
  - Clean up the duplicative and brittle loop tests in test.c. There were
    address-dependent bugs here, eg. they would only manifest if a segment
    ended at exactly 4G or had a length that was a near multiple of SPINSZ.
 
-   Some of these bugs were silent. For example test 7 would terminate
-   early (without testing all memory) if the range from calculate_chunk()
-   happens to map to the exact top of 4GB address space. It's possible
-   that other tests suffered from the same bug. Others were louder;
-   I fixed at least one infinite loop that was cropping up in test 3.
+   Some bugs were silent, for example test 7 would stop early (without
+   testing all memory) if the range from calculate_chunk() maps to the
+   exact top of 4GB address space. Other tests may have the same bug.
 
-   Don't squish individual bugs; deny them a habitat. Use a shared
-   'foreach_segment()' routine in all tests to set up the loops
-   consistently for all tests. Unit test this routine to ensure it's
-   right. Avoid overflows, not by being excruciatingly careful,
+   To deny bugs their habitat, all tests share a new 'foreach_segment()'
+   routine providing the segment-loop logic in a single central place.
+   The new logic avoids overflow, not by being excruciatingly careful,
    but by computing loop bounds in terms of dword indices instead of
-   byte addresses, so all quantities are far from the 4G overflow line.
+   byte addresses. Thus all quantities are far from the 4G overflow line.
 
  - Avoid 1- and 2-letter variable names. This is a work in progress.
    Favor names that are meaningful, or at least searchable.
 
  - Indent consistently. Replace tab characters with spaces so the code will
-   render the same for everyone.
+   render the same for everyone (the jwz standard.)
 
  - In test 7 (block moves) replace assembly with C for everything except
    the 'movsl' instruction that does all the real work of this test.
    The rewritten test performs within a measurement error of the original.
    I have a flaky machine which fails the original block_move test, and it
-   fails the new one too with the same failure mode, as expected.
+   also fails the new one with the same failure mode, as expected.
 
  - In test 10 (modtst) replace assembly with C. It had to be modified to
    work with the new loop bounds logic. I was less confident in my ability
