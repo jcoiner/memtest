@@ -1032,10 +1032,12 @@ void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
 #if 1
+#if 0  // BOZO
     // JPC BOZO: This is no better for the test 7 interrupt
     // than the assembly version.
     for (ulong i = 0; i < size_in_dwords; i++)
         dest[i] = src[i];
+#endif
 #else
     asm __volatile__
         (
@@ -1202,23 +1204,49 @@ void block_move(int iter, int me)
     ctx.me = me;
 
     // JPC BOZO:
-    // Next step is to cut this down.
     // Try with only the first 2 foreachs
     // and then with only the first 1
+    //
+    // Conclusion: if the block_move_move call
+    // is unoptimized or iffed-out, we're fine,
+    // and if optimized we crash.
+    //
+    // Everything we've done so far is with inlining
+    // enabled (I think) but can we disable that, and thus
+    // ensure the push/pop of optimizations really applies
+    // exactly where it says? Try that...
+    //  * -fno-inline-small-functions had no effect
+    //    on the generated assembly
+    //
+    // It doesn't look like the difference between optimized
+    // and unoptimized block_move() -- and between pass and fail
+    // -- is anything getting inlined. The functions are too close
+    // in length, probably.
 
-    
+    // What about this: if we nop movsl out, does it crash?
+    // Rule a collision there in or out...
+    // WHOA: we still crash without the movsl. huh!!
+
+
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
     { BAILR }
     s_barrier();
 
+    // PASS
+    //#if 0  // move me
+
     /* Now move the data around */
     sliced_foreach_segment(&ctx, me, block_move_move);
     { BAILR }
     s_barrier();
+    // FAIL:
+#if 0  // move me
 
     /* And check it. */
     sliced_foreach_segment(&ctx, me, block_move_check);
+
+#endif  // this does not move
 }
 
 // PASS! and again!
