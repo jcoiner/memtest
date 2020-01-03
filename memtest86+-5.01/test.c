@@ -163,7 +163,10 @@ void sliced_foreach_segment
         calculate_chunk(&start, &end, me, j, 64);
 
         // Ensure no overlap among chunks
-        ASSERT(prev_end < start);
+        ASSERT(end > start);
+        if (prev_end > 0) {
+            ASSERT(prev_end < start);
+        }
         prev_end = end;
 
         foreach_segment(start, end, me, ctx, func);
@@ -1022,9 +1025,18 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     sliced_foreach_segment(&ctx, me, modtst_check);
 }
 
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+
 void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
+#if 1
+    // JPC BOZO: This is no better for the test 7 interrupt
+    // than the assembly version.
+    for (ulong i = 0; i < size_in_dwords; i++)
+        dest[i] = src[i];
+#else
     asm __volatile__
         (
          "cld\n"
@@ -1042,6 +1054,7 @@ void movsl(ulong* dest,
          :: "g" (src), "g" (dest), "g" (size_in_dwords)
          : "edi", "esi", "ecx"
          );
+#endif
 }
 
 ulong block_move_normalize_len_dw(ulong len_dw) {
@@ -1113,6 +1126,11 @@ typedef struct {
     int me;
 } block_move_ctx;
 
+//  FAIL -- immediate illegal instruction
+//#pragma GCC pop_options
+
+// JPC BOZO: Q) does removing restrict from buf help?
+//           A) Nope, still an immediate trap
 void block_move_move(ulong* restrict buf,
                      ulong len_dw, const void* vctx) {
     const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
@@ -1150,6 +1168,9 @@ void block_move_move(ulong* restrict buf,
     }
 }
 
+// FAIL: immediate trap
+//#pragma GCC pop_options
+
 void block_move_check(ulong* restrict buf,
                       ulong len_dw, const void* unused_ctx) {
     len_dw = block_move_normalize_len_dw(len_dw);
@@ -1165,6 +1186,9 @@ void block_move_check(ulong* restrict buf,
     }
 }
 
+// FAIL immediate trap!
+#pragma GCC pop_options
+
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
@@ -1177,6 +1201,12 @@ void block_move(int iter, int me)
     ctx.iter = iter;
     ctx.me = me;
 
+    // JPC BOZO:
+    // Next step is to cut this down.
+    // Try with only the first 2 foreachs
+    // and then with only the first 1
+
+    
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
     { BAILR }
@@ -1190,6 +1220,9 @@ void block_move(int iter, int me)
     /* And check it. */
     sliced_foreach_segment(&ctx, me, block_move_check);
 }
+
+// PASS! and again!
+//#pragma GCC pop_options
 
 typedef struct {
     ulong pat;
