@@ -125,6 +125,7 @@ void foreach_segment
             break;
         }
 
+        ASSERT(((ulong)seg_end_dw) <= 0x40000000);
         ASSERT(seg_end_dw > seg_dw);
         ulong seg_len_dw = seg_end_dw - seg_dw;
 
@@ -1071,6 +1072,8 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
     // be 64-byte aligned, it can be any dword.
     ulong result = (len_dw >> 5) << 5;
     ASSERT(result > 0);
+    // DEBUGF("normalize len_dw = 0x%x result = 0x%x\n", len_dw, result);
+    ASSERT(result <= len_dw);  // ?? bozo needed?
     return result;
 }
 
@@ -1107,7 +1110,7 @@ void block_move_init(ulong* restrict buf,
         buf[14] = neg_val;             //   0xfffffffe
         buf[15] = neg_val;             //   0xfffffffe
 
-        buf += 16;  // advance p to next 64-byte block
+        buf += 16;  // advance to next 64-byte block
         len--;
 
         // Rotate the bit left, including an all-zero state.
@@ -1226,6 +1229,11 @@ void block_move(int iter, int me)
     // What about this: if we nop movsl out, does it crash?
     // Rule a collision there in or out...
     // WHOA: we still crash without the movsl. huh!!
+
+
+    // THINGS TO TRY:
+    //  - zero out the rewritten addr_tst1 in case that's toxic
+    //  - zero out the block_move_init in case that's toxic
 
 
     /* Initialize memory with the initial pattern.  */
