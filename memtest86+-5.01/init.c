@@ -305,7 +305,7 @@ void init(void)
         get_spd_spec();
         if(num_cpus <= 16 && !(vv->fail_safe & 4)) { coretemp(); }
     }
-	
+
     if(vv->check_temp > 0 && !(vv->fail_safe & 4))
     {
         cprint(LINE_CPU, 26, "|  CPU Temp");
