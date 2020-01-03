@@ -170,105 +170,65 @@ void sliced_foreach_segment
     }
 }
 
+void addr_tst1_seg(ulong* restrict buf, ulong len_dw, const void* unused) {
+    // Within each segment:
+    //  - choose a low dword offset 'off'
+    //  - write pat to *off
+    //  - write ~pat to addresses that are above off by
+    //    1, 2, 4, ... dwords up to the top of the segment. None
+    //    should alias to the original dword.
+    //  - write ~pat to addresses that are below off by
+    //    1, 2, 4, etc dwords, down to the start of the segment. None
+    //    should alias to the original dword. If adding a given offset
+    //    doesn't produce a single bit address flip (because it produced
+    //    a carry) subtracting the same offset should give a single bit flip.
+    //  - repeat this, moving off ahead in increments of 1MB;
+    //    this covers address bits within physical memory banks, we hope?
+
+    ulong pat;
+    int k;
+
+    for (pat=0x5555aaaa, k=0; k<2; k++) {
+        hprint(LINE_PAT, COL_PAT, pat);
+
+        for (ulong off_dw = 0; off_dw < len_dw; off_dw += (1 << 18)) {
+            buf[off_dw] = pat;
+            pat = ~pat;
+
+            for (ulong more_off_dw = 1; off_dw + more_off_dw < len_dw;
+                 more_off_dw = more_off_dw << 1) {
+                ASSERT(more_off_dw);  // it should never get to zero
+                buf[off_dw + more_off_dw] = pat;
+                ulong bad;
+                if ((bad = buf[off_dw]) != ~pat) {
+                    ad_err1(buf + off_dw,
+                            buf + off_dw + more_off_dw,
+                            bad, ~pat);
+                    break;
+                }
+            }
+            for (ulong more_off_dw = 1; off_dw > more_off_dw;
+                 more_off_dw = more_off_dw << 1) {
+                ASSERT(more_off_dw);  // it should never get to zero
+                buf[off_dw - more_off_dw] = pat;
+                ulong bad;
+                if ((bad = buf[off_dw]) != ~pat) {
+                    ad_err1(buf + off_dw,
+                            buf + off_dw - more_off_dw,
+                            bad, ~pat);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 /*
  * Memory address test, walking ones
  */
 void addr_tst1(int me)
 {
-    int i, j, k;
-    volatile ulong *p, *pt, *end;
-    ulong bad, mask, bank, p1;
-
-    /* Test the global address bits */
-    for (p1=0, j=0; j<2; j++) {
-        hprint(LINE_PAT, COL_PAT, p1);
-
-        /* Set pattern in our lowest multiple of 0x20000 */
-        p = (ulong *)roundup((ulong)vv->map[0].start, 0x1ffff);
-        *p = p1;
-
-        /* Now write pattern complement */
-        p1 = ~p1;
-        end = vv->map[segs-1].end;
-        for (i=0; i<100; i++) {
-            mask = 4;
-            do {
-                pt = (ulong *)((ulong)p | mask);
-                if (pt == p) {
-                    mask = mask << 1;
-                    continue;
-                }
-                if (pt >= end) {
-                    break;
-                }
-                *pt = p1;
-                if ((bad = *p) != ~p1) {
-                    ad_err1((ulong *)p, (ulong *)mask,
-                            bad, ~p1);
-                    i = 1000;
-                }
-                mask = mask << 1;
-            } while(mask);
-        }
-        do_tick(me);
-        { BAILR }
-    }
-
-    /* Now check the address bits in each bank */
-    /* If we have more than 8mb of memory then the bank size must be */
-    /* bigger than 256k.  If so use 1mb for the bank size. */
-    if (vv->pmap[vv->msegs - 1].end > (0x800000 >> 12)) {
-        bank = 0x100000;
-    } else {
-        bank = 0x40000;
-    }
-    for (p1=0, k=0; k<2; k++) {
-        hprint(LINE_PAT, COL_PAT, p1);
-
-        for (j=0; j<segs; j++) {
-            p = vv->map[j].start;
-            /* Force start address to be a multiple of 256k */
-            p = (ulong *)roundup((ulong)p, bank - 1);
-            end = vv->map[j].end;
-            /* Redundant checks for overflow */
-            while (p < end && p > vv->map[j].start && p != 0) {
-                *p = p1;
-
-                p1 = ~p1;
-                for (i=0; i<50; i++) {
-                    mask = 4;
-                    do {
-                        pt = (ulong *)
-                            ((ulong)p | mask);
-                        if (pt == p) {
-                            mask = mask << 1;
-                            continue;
-                        }
-                        if (pt >= end) {
-                            break;
-                        }
-                        *pt = p1;
-                        if ((bad = *p) != ~p1) {
-                            ad_err1((ulong *)p,
-                                    (ulong *)mask,
-                                    bad,~p1);
-                            i = 200;
-                        }
-                        mask = mask << 1;
-                    } while(mask);
-                }
-                if (p + bank > p) {
-                    p += bank;
-                } else {
-                    p = end;
-                }
-                p1 = ~p1;
-            }
-        }
-        do_tick(me);
-        { BAILR }
-        p1 = ~p1;
-    }
+    unsliced_foreach_segment(nullptr, me, addr_tst1_seg);
 }
 
 void addr_tst2_init_segment(ulong* p,

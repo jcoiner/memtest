@@ -84,7 +84,8 @@ struct 		vars * const vv = &variables;
 volatile int 	bail;
 int 		nticks;
 int 		test_ticks;
-volatile int 	segs;
+volatile int 	segs;   /* number of entries in vv->map[]
+                           (Why not be a member of vars then?) */
 static int	ltest;
 static int	pass_flag = 0;
 volatile short	start_seq = 0;

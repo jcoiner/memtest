@@ -159,10 +159,7 @@ int main() {
 
     foreach_tests();
 
-    
     // TEST 0
-    // NOTE: in prod, this runs with cache disabled
-    //       but we can't do anything about the cache in userspace.
     addr_tst1(me);
 
     // TEST 1, 2

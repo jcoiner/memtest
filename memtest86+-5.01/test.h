@@ -247,12 +247,13 @@ static inline void cache_on(void)
 struct mmap {
     ulong pbase_addr;
     ulong *start;  // VA of segment start
-    ulong *end;    // VA of segment end
+    ulong *end;    // VA of the last dword within the segment.
 };
 
 struct pmap {
-    ulong start;
-    ulong end;
+    ulong start;   /* phys page number of RAM segment start,
+                      in 4K pages. */
+    ulong end;  // phys page number (past the end? or inclusive?)
 };
 
 struct tseq {
@@ -295,7 +296,7 @@ struct vars {
     int msg_line;
     int ecount;
     int ecc_ecount;
-    int msegs;
+    int msegs;  // number of entries in pmap[]
     int testsel;
     int scroll_start;
     int pass_ticks;
@@ -303,7 +304,9 @@ struct vars {
     int pptr;
     int tptr;
     struct err_info erri;
+    // PA ranges from e820 table:
     struct pmap pmap[MAX_MEM_SEGMENTS];
+    // VA mappings:
     volatile struct mmap map[MAX_MEM_SEGMENTS];
     ulong plim_lower;  // phys page number
     ulong plim_upper;  // phys page number
