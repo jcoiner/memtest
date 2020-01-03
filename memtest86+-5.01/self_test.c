@@ -124,6 +124,8 @@ int main() {
 
     get_cpuid();
 
+    // add a non-power-of-2 pad to the size, so things don't line
+    // up too nicely. Chose 508 because it's not 512.
     const int kTestSizeDwords = SPINSZ_DWORDS * 2 + 508;
 
     // Allocate an extra cache line on each end, where we'll
@@ -144,12 +146,13 @@ int main() {
         raw_end &= ~0x3f;
     }
 
-    ulong start = raw_start + 64; // exclude low sentinel cache line
-    ulong end   = raw_end   - 64; // exclude high sentinel cache line
+    const int kSentinelBytes = 48;
+    ulong start = raw_start + kSentinelBytes; // exclude low sentinel
+    ulong end   = raw_end   - kSentinelBytes; // exclude high sentinel
 
     // setup sentinels
-    memset((ulong*)raw_start, 'z', 64);
-    memset((ulong*)end, 'z', 64);
+    memset((ulong*)raw_start, 'z', kSentinelBytes);
+    memset((ulong*)end,       'z', kSentinelBytes);
 
     vv->map[0].start = (ulong*)start;
     vv->map[0].end = ((ulong*)end) - 1;  // map.end points to xxxxxfc
@@ -187,7 +190,7 @@ int main() {
 
 
     // Check sentinels, they should not have been overwritten. Do this last.
-    for (int j=0; j<64; j++) {
+    for (int j=0; j<kSentinelBytes; j++) {
         assert(((char*)raw_start)[j] == 'z');
         assert(((char*)end)[j]       == 'z');
     }

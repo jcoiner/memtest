@@ -89,10 +89,10 @@ void foreach_segment
 
     ASSERT(start < end);
 
-    // Confirm 'start' is cache-line aligned, and 'end'
-    // should point to the last dword on a cache line.
-    ASSERT(0    == (((ulong)start) & 0x3f));
-    ASSERT(0x3c == (((ulong)end)   & 0x3f));
+    // Confirm 'start' points to an even dword, and 'end'
+    // should point to an odd dword
+    ASSERT(0   == (((ulong)start) & 0x7));
+    ASSERT(0x4 == (((ulong)end)   & 0x7));
 
     // 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
     //
@@ -101,7 +101,7 @@ void foreach_segment
     ulong start_dw = ((ulong)start) >> 2;
     ulong   end_dw = ((ulong)  end) >> 2;
 
-    // end is always xxxxxffc, but increment end_dw to a cache-line-aligned
+    // end is always xxxxxffc, but increment end_dw to an
     // address beyond the segment for easier boundary calculations.
     ++end_dw;
 
@@ -1057,11 +1057,9 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
     return (len_dw >> 5) << 5;
 }
 
-void block_move_init(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
-    // p is the start address for the current segment.
-
+void block_move_init(ulong* restrict buf, ulong len_dw, const void* unused_ctx) {
     len_dw = block_move_normalize_len_dw(len_dw);
-    
+
     // Compute 'len' in units of 64-byte chunks:
     ulong len = len_dw >> 4;
 
@@ -1074,24 +1072,24 @@ void block_move_init(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
         ulong neg_val = ~base_val;
 
         // Set a block of 64 bytes   //   first block DWORDS are:
-        p[0] = base_val;             //   0x00000001
-        p[1] = base_val;             //   0x00000001
-        p[2] = base_val;             //   0x00000001
-        p[3] = base_val;             //   0x00000001
-        p[4] = neg_val;              //   0xfffffffe
-        p[5] = neg_val;              //   0xfffffffe
-        p[6] = base_val;             //   0x00000001
-        p[7] = base_val;             //   0x00000001
-        p[8] = base_val;             //   0x00000001
-        p[9] = base_val;             //   0x00000001
-        p[10] = neg_val;             //   0xfffffffe
-        p[11] = neg_val;             //   0xfffffffe
-        p[12] = base_val;            //   0x00000001
-        p[13] = base_val;            //   0x00000001
-        p[14] = neg_val;             //   0xfffffffe
-        p[15] = neg_val;             //   0xfffffffe
+        buf[0] = base_val;             //   0x00000001
+        buf[1] = base_val;             //   0x00000001
+        buf[2] = base_val;             //   0x00000001
+        buf[3] = base_val;             //   0x00000001
+        buf[4] = neg_val;              //   0xfffffffe
+        buf[5] = neg_val;              //   0xfffffffe
+        buf[6] = base_val;             //   0x00000001
+        buf[7] = base_val;             //   0x00000001
+        buf[8] = base_val;             //   0x00000001
+        buf[9] = base_val;             //   0x00000001
+        buf[10] = neg_val;             //   0xfffffffe
+        buf[11] = neg_val;             //   0xfffffffe
+        buf[12] = base_val;            //   0x00000001
+        buf[13] = base_val;            //   0x00000001
+        buf[14] = neg_val;             //   0xfffffffe
+        buf[15] = neg_val;             //   0xfffffffe
 
-        p += 16;  // advance p to next cache line
+        buf += 16;  // advance p to next 64-byte block
         len--;
 
         // Rotate the bit left, including an all-zero state.
@@ -1112,7 +1110,8 @@ typedef struct {
     int me;
 } block_move_ctx;
 
-void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
+void block_move_move(ulong* restrict buf,
+                     ulong len_dw, const void* vctx) {
     const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
     ulong iter = ctx->iter;
     int me = ctx->me;
@@ -1124,7 +1123,9 @@ void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
      * Then move the data to the original location + 32 bytes
      */
     ulong half_len_dw = len_dw / 2; // Half the size of this block in DWORDS
-    ulong* pp = p + half_len_dw;    // VA at mid-point of this block.
+    ASSERT(half_len_dw > 8);
+
+    ulong* mid = buf + half_len_dw;    // VA at mid-point of this block.
     for (int i=0; i<iter; i++) {
         if (i > 0) {
             // foreach_segment() called this before the 0th iteration,
@@ -1138,19 +1139,20 @@ void block_move_move(ulong* restrict p, ulong len_dw, const void* vctx) {
         // pe == block end
 
         // Move first half to 2nd half:
-        movsl(/*dest=*/ pp, /*src=*/ p, half_len_dw);
+        movsl(/*dest=*/ mid, /*src=*/ buf, half_len_dw);
 
         // Move the second half, less the last 8 dwords
         // to the first half plus an offset of 8 dwords.
-        movsl(/*dest=*/ p + 8, /*src=*/ pp, half_len_dw - 8);
+        movsl(/*dest=*/ buf + 8, /*src=*/ mid, half_len_dw - 8);
 
         // Finally, move the last 8 dwords of the 2nd half
         // to the first 8 dwords of the first half.
-        movsl(/*dest=*/ pp + half_len_dw - 8, /*src=*/ p, 8);
+        movsl(/*dest=*/ mid + half_len_dw - 8, /*src=*/ buf, 8);
     }
 }
 
-void block_move_check(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
+void block_move_check(ulong* restrict buf,
+                      ulong len_dw, const void* unused_ctx) {
     len_dw = block_move_normalize_len_dw(len_dw);
 
     /* Now check the data.
@@ -1158,8 +1160,8 @@ void block_move_check(ulong* restrict p, ulong len_dw, const void* unused_ctx) {
      * adjacent words are the same.
      */
     for (ulong i = 0; i < len_dw; i = i + 2) {
-        if (p[i] != p[i+1]) {
-            mt86_error(p+i, p[i], p[i+1]);
+        if (buf[i] != buf[i+1]) {
+            mt86_error(buf+i, buf[i], buf[i+1]);
         }
     }
 }
