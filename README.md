@@ -11,13 +11,20 @@ Non-goals of this fork:
 
 ## TODO
 
+ - Was getting errors in test 7 at what looked like maybe
+   the very highest (..0000) or lowest (..fffc) addresses in
+   some segments. huh? this was on the ryzen, bare metal.
+
+ - Why won't it start up on bare metal (thinkpad
+   or the ryzen box) when compiled with -O2?
+   * virtualbox is happy with -O2
+   * bare metal is happy if we build with -O1. hmm!
+
  - Review to see if I've broken any of the ticks-counting logic,
    now that I see how fragile it is (doh!)
 
  - Apply the rest of the ubuntu/debian patches.
    Get in touch with distro maintainers. what's the next step?
-
- - Why won't it start up on the thinkpad T400?
 
  - Test SMP a little bit, ensure it's not borked. Getting SMP fully
    stable is not a goal but let's not make it worse.
@@ -71,11 +78,11 @@ Non-goals of this fork:
    to modify assembly. GCC's output looks just as tight as the handwritten
    assembly.
 
-   Side note: we're compiling test.c with -O2 now. Someone had knocked it
+   Side note: we're compiling test.c with -O1 now. Someone had knocked it
    down to -O0 in 5.01 (why? to make the assembly look better? to
    work around one of the many bugs that are now fixed?) In any event,
-   things are working well at -O2 now. When I compared the compiler's code
-   to the original assembly for modtst, it was -O2 output.
+   things are working well at -O1 now, which helps the compiler to
+   compete with manual assembly.
 
  - Rewrite test 1 (addr_tst1) to fix a bug. Before, it could possibly
    write to stray addresses that aren't mapped to DRAM (and could be
