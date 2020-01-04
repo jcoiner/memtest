@@ -17,12 +17,11 @@ CFLAGS= -Wall -Werror -march=i486 -m32 -O1 -fomit-frame-pointer -fno-builtin \
 
 SELF_TEST_CFLAGS = -Wall -Werror -march=i486 -m32 -O1 -g
 
-OBJS= head.o reloc.o main.o test.o block_move.o init.o lib.o patn.o \
-      screen_buffer.o \
+OBJS= head.o reloc.o main.o test.o init.o lib.o patn.o screen_buffer.o \
       config.o cpuid.o linuxbios.o pci.o memsize.o spd.o error.o dmi.o controller.o \
       smp.o vmem.o random.o
 
-SELF_TEST_OBJS = test.o block_move.o self_test.o cpuid.o random.o
+SELF_TEST_OBJS = test.o self_test.o cpuid.o random.o
 
 all: memtest.bin memtest self_test run_self_test
 
@@ -61,10 +60,6 @@ memtest.bin: memtest_shared.bin bootsect.o setup.o memtest.bin.lds
 
 reloc.o: reloc.c
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing reloc.c
-
-# BOZO
-block_move.o : block_move.c
-	$(CC) -c $(CFLAGS) -falign-functions=64 block_move.c
 
 self_test.o : self_test.c
 	$(CC) -c $(SELF_TEST_CFLAGS) self_test.c
