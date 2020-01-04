@@ -62,6 +62,10 @@ memtest.bin: memtest_shared.bin bootsect.o setup.o memtest.bin.lds
 reloc.o: reloc.c
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing reloc.c
 
+# BOZO
+block_move.o : block_move.c
+	$(CC) -c $(CFLAGS) -falign-functions=64 block_move.c
+
 self_test.o : self_test.c
 	$(CC) -c $(SELF_TEST_CFLAGS) self_test.c
 

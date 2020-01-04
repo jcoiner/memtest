@@ -29,9 +29,8 @@ void block_move_check(ulong* restrict buf,
  */
 void block_move(int iter, int me)
 {
-    //asm __volatile__ ( ".p2align 8");
-
-    cprint(LINE_PAT, COL_PAT-2, "          ");
+    // BOZO
+    //    cprint(LINE_PAT, COL_PAT-2, "          ");
 
     block_move_ctx ctx;
     ctx.iter = iter;
@@ -114,6 +113,23 @@ void block_move(int iter, int me)
     //   - so, we'll have to move block_move into its own TU
     //     checkpoint the code first.
 
+    // After moving block_move into block_move.c :
+    //  * we can still toggle the crash by toggling the O0 pragma.
+    //  * -falign-functions=64 yields identical block_move lengths
+    //     but only when trailing function fooff() is present
+    //  * Q) Did we really produce binaries that are identical
+    //       apart from the block_move instruction stream?
+    //    A1) No, because the linker is too smart and prunes
+    //        the padding back out (facepalm)
+    //    A2) No, because the GOT is a different
+    //        size (or diff position?) for opt vs noopt cases.
+    //        This should be independent of the size of block_move.
+    //        Confirmed that both block_moves have equal sets of
+    //        linker-resolved addresses.
+    //    A3) Why do we even get an .eh_frame section, and why
+    //        is it completely different for opt vs noopt?
+
+
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
     { BAILR }
@@ -127,12 +143,14 @@ void block_move(int iter, int me)
     { BAILR }
     s_barrier();
 
-#if 1  // removing this doesn't fix the crash
+#if 0  // removing this doesn't fix the crash
     /* And check it. */
     sliced_foreach_segment(&ctx, me, block_move_check);
 #endif  // this does not move
-
-    //asm __volatile__ ( ".p2align 8");
 }
 
 #pragma GCC pop_options
+
+// Must be present for -falign-functions to have any effect
+// (BOZO that seems like a compiler bug by itself!)
+void fooff() {}
