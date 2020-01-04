@@ -45,8 +45,8 @@ static inline ulong roundup(ulong value, ulong mask)
 // me - this threads CPU number
 // j - index into v->map for current segment we are testing
 // align - number of bytes to align each block to
-void calculate_chunk(ulong** start, ulong** end, int me,
-                     int j, int makeMultipleOf)
+static void calculate_chunk(ulong** start, ulong** end, int me,
+                            int j, int makeMultipleOf)
 {
     ulong chunk;
 
@@ -140,7 +140,7 @@ void foreach_segment
  * Does not slice by CPU number, so it covers the entire memory.
  * Contrast to sliced_foreach_segment().
  */
-void unsliced_foreach_segment
+static void unsliced_foreach_segment
 (const void* ctx, int me, segment_fn func) {
     int j;
     for (j=0; j<segs; j++) {
@@ -155,7 +155,7 @@ void unsliced_foreach_segment
  * In multicore mode, slices the segments by 'me' (the CPU ordinal
  * number) so that each call will cover only 1/Nth of memory.
  */
-void sliced_foreach_segment
+static void sliced_foreach_segment
 (const void *ctx, int me, segment_fn func) {
     int j;
     ulong *start, *end;  // VAs
@@ -174,7 +174,8 @@ void sliced_foreach_segment
     }
 }
 
-void addr_tst1_seg(ulong* restrict buf, ulong len_dw, const void* unused) {
+static void addr_tst1_seg(ulong* restrict buf,
+                          ulong len_dw, const void* unused) {
     // BOZO : short-circuiting this DOES NOT fix test 7
     //if (len_dw > 0) { return; }
 
@@ -238,9 +239,8 @@ void addr_tst1(int me)
     unsliced_foreach_segment(nullptr, me, addr_tst1_seg);
 }
 
-void addr_tst2_init_segment(ulong* p,
-                            ulong len_dw,
-                            const void* unused) {
+static void addr_tst2_init_segment(ulong* p,
+                                   ulong len_dw, const void* unused) {
     ulong* pe = p + (len_dw - 1);
 
     /* Original C code replaced with hand tuned assembly code
@@ -261,9 +261,8 @@ void addr_tst2_init_segment(ulong* p,
                       );
 }
 
-void addr_tst2_check_segment(ulong* p,
-                             ulong len_dw,
-                             const void* unused) {
+static void addr_tst2_check_segment(ulong* p,
+                                    ulong len_dw, const void* unused) {
     ulong* pe = p + (len_dw - 1);
 
     /* Original C code replaced with hand tuned assembly code
@@ -324,9 +323,8 @@ typedef struct {
     ulong xorVal;    
 } movinvr_ctx;
 
-void movinvr_init(ulong* p,
-                  ulong len_dw,
-                  const void* vctx) {
+static void movinvr_init(ulong* p,
+                         ulong len_dw, const void* vctx) {
     ulong* pe = p + (len_dw - 1);
     const movinvr_ctx* ctx = (const movinvr_ctx*)vctx;
     /* Original C code replaced with hand tuned assembly code */
@@ -354,9 +352,7 @@ void movinvr_init(ulong* p,
          );
 }
 
-void movinvr_body(ulong* p,
-                  ulong len_dw,
-                  const void* vctx) {
+static void movinvr_body(ulong* p, ulong len_dw, const void* vctx) {
     ulong* pe = p + (len_dw - 1);
     const movinvr_ctx* ctx = (const movinvr_ctx*)vctx;
 
@@ -497,7 +493,8 @@ typedef struct {
     ulong p2;
 } movinv1_ctx;
 
-void movinv1_init(ulong* start, ulong len_dw, const void* vctx) {
+static void movinv1_init(ulong* start,
+                         ulong len_dw, const void* vctx) {
     const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
 
     ulong p1 = ctx->p1;
@@ -511,7 +508,8 @@ void movinv1_init(ulong* start, ulong len_dw, const void* vctx) {
          );
 }
 
-void movinv1_bottom_up(ulong* start, ulong len_dw, const void* vctx) {
+static void movinv1_bottom_up(ulong* start,
+                              ulong len_dw, const void* vctx) {
     const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
     ulong p1 = ctx->p1;
     ulong p2 = ctx->p2;
@@ -563,7 +561,8 @@ void movinv1_bottom_up(ulong* start, ulong len_dw, const void* vctx) {
          );
 }
 
-void movinv1_top_down(ulong* start, ulong len_dw, const void* vctx) {
+static void movinv1_top_down(ulong* start,
+                             ulong len_dw, const void* vctx) {
     const movinv1_ctx* ctx = (const movinv1_ctx*)vctx;
     ulong p1 = ctx->p1;
     ulong p2 = ctx->p2;
@@ -664,7 +663,8 @@ typedef struct {
     int off;
 } movinv32_ctx;
 
-void movinv32_init(ulong* restrict buf, ulong len_dw, const void* vctx) {
+static void movinv32_init(ulong* restrict buf,
+                          ulong len_dw, const void* vctx) {
     const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
 
     ulong* p = buf;
@@ -713,7 +713,8 @@ void movinv32_init(ulong* restrict buf, ulong len_dw, const void* vctx) {
          );
 }
 
-void movinv32_bottom_up(ulong* restrict buf, ulong len_dw, const void* vctx) {
+static void movinv32_bottom_up(ulong* restrict buf, ulong len_dw,
+                               const void* vctx) {
     const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
 
     ulong* p = buf;
@@ -798,7 +799,8 @@ void movinv32_bottom_up(ulong* restrict buf, ulong len_dw, const void* vctx) {
          );
 }
 
-void movinv32_top_down(ulong* restrict buf, ulong len_dw, const void* vctx) {
+static void movinv32_top_down(ulong* restrict buf,
+                              ulong len_dw, const void* vctx) {
     const movinv32_ctx* restrict ctx = (const movinv32_ctx*)vctx;
 
     ulong* pe = buf;
@@ -954,8 +956,8 @@ typedef struct {
     ulong p2;
 } modtst_ctx;
 
-void modtst_sparse_writes(ulong* restrict start,
-                          ulong len_dw, const void* vctx) {
+static void modtst_sparse_writes(ulong* restrict start,
+                                 ulong len_dw, const void* vctx) {
     const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
     ulong p1 = ctx->p1;
     ulong offset = ctx->offset;
@@ -965,8 +967,8 @@ void modtst_sparse_writes(ulong* restrict start,
     }
 }
 
-void modtst_dense_writes(ulong* restrict start, ulong len_dw,
-                         const void* vctx) {
+static void modtst_dense_writes(ulong* restrict start, ulong len_dw,
+                                const void* vctx) {
     const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
     ulong p2 = ctx->p2;
     ulong offset = ctx->offset;
@@ -984,7 +986,8 @@ void modtst_dense_writes(ulong* restrict start, ulong len_dw,
     }
 }
 
-void modtst_check(ulong* restrict start, ulong len_dw, const void* vctx) {
+static void modtst_check(ulong* restrict start,
+                         ulong len_dw, const void* vctx) {
     const modtst_ctx* restrict ctx = (const modtst_ctx*)vctx;
     ulong p1 = ctx->p1;
     ulong offset = ctx->offset;
@@ -1076,8 +1079,8 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
     return result;
 }
 
-void block_move_init(ulong* restrict buf,
-                     ulong len_dw, const void* unused_ctx) {
+static void block_move_init(ulong* restrict buf,
+                            ulong len_dw, const void* unused_ctx) {
     // JPC BOZO:
     // short circuiting this DOES NOT fix the test 7 crash!
     //if (len_dw > 0) { return; }
@@ -1134,13 +1137,10 @@ typedef struct {
     int me;
 } block_move_ctx;
 
-//  FAIL -- immediate illegal instruction
-//#pragma GCC pop_options
-
 // JPC BOZO: Q) does removing restrict from buf help?
 //           A) Nope, still an immediate trap
-void block_move_move(ulong* restrict buf,
-                     ulong len_dw, const void* vctx) {
+static void block_move_move(ulong* restrict buf,
+                            ulong len_dw, const void* vctx) {
     const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
     ulong iter = ctx->iter;
     int me = ctx->me;
@@ -1176,11 +1176,8 @@ void block_move_move(ulong* restrict buf,
     }
 }
 
-// FAIL: immediate trap
-//#pragma GCC pop_options
-
-void block_move_check(ulong* restrict buf,
-                      ulong len_dw, const void* unused_ctx) {
+static void block_move_check(ulong* restrict buf,
+                             ulong len_dw, const void* unused_ctx) {
     len_dw = block_move_normalize_len_dw(len_dw);
 
     /* Now check the data.
@@ -1194,13 +1191,42 @@ void block_move_check(ulong* restrict buf,
     }
 }
 
+#if 0
 void block_move(int iter, int me);  // BOZO
+#else
+/*
+ * Test memory using block moves 
+ * Adapted from Robert Redelmeier's burnBX test
+ */
+void block_move(int iter, int me)
+{
+    cprint(LINE_PAT, COL_PAT-2, "          ");
+
+    block_move_ctx ctx;
+    ctx.iter = iter;
+    ctx.me = me;
+
+    /* Initialize memory with the initial pattern.  */
+    sliced_foreach_segment(&ctx, me, block_move_init);
+    { BAILR }
+    s_barrier();
+
+    /* Now move the data around */
+    sliced_foreach_segment(&ctx, me, block_move_move);
+    { BAILR }
+    s_barrier();
+
+    /* And check it. */
+    sliced_foreach_segment(&ctx, me, block_move_check);
+}
+#endif
 
 typedef struct {
     ulong pat;
 } bit_fade_ctx;
 
-void bit_fade_fill_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
+static void bit_fade_fill_seg(ulong* restrict p,
+                              ulong len_dw, const void* vctx) {
     const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
     ulong pat = ctx->pat;
 
@@ -1223,7 +1249,8 @@ void bit_fade_fill(ulong p1, int me)
     unsliced_foreach_segment(&ctx, me, bit_fade_fill_seg);
 }
 
-void bit_fade_chk_seg(ulong* restrict p, ulong len_dw, const void* vctx) {
+static void bit_fade_chk_seg(ulong* restrict p,
+                             ulong len_dw, const void* vctx) {
     const bit_fade_ctx* restrict ctx = (const bit_fade_ctx*)vctx;
     ulong pat = ctx->pat;
 

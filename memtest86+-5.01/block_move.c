@@ -23,6 +23,8 @@ void block_move_check(ulong* restrict buf,
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
 
+#if 0
+
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
@@ -155,6 +157,8 @@ void block_move(int iter, int me)
     sliced_foreach_segment(&ctx, me, block_move_check);
 #endif  // this does not move
 }
+
+#endif
 
 #pragma GCC pop_options
 
