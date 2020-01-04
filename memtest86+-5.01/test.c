@@ -175,6 +175,9 @@ void sliced_foreach_segment
 }
 
 void addr_tst1_seg(ulong* restrict buf, ulong len_dw, const void* unused) {
+    // BOZO : short-circuiting this DOES NOT fix test 7
+    //if (len_dw > 0) { return; }
+
     // Within each segment:
     //  - choose a low dword offset 'off'
     //  - write pat to *off
@@ -1026,19 +1029,15 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     sliced_foreach_segment(&ctx, me, modtst_check);
 }
 
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
-
 void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
-#if 1
-#if 0  // BOZO
+#if 0
     // JPC BOZO: This is no better for the test 7 interrupt
     // than the assembly version.
+    // Removing this entirely doesn't help, either.
     for (ulong i = 0; i < size_in_dwords; i++)
         dest[i] = src[i];
-#endif
 #else
     asm __volatile__
         (
@@ -1079,6 +1078,10 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
 
 void block_move_init(ulong* restrict buf,
                      ulong len_dw, const void* unused_ctx) {
+    // JPC BOZO:
+    // short circuiting this DOES NOT fix the test 7 crash!
+    //if (len_dw > 0) { return; }
+
     len_dw = block_move_normalize_len_dw(len_dw);
 
     // Compute 'len' in units of 64-byte chunks:
@@ -1191,8 +1194,8 @@ void block_move_check(ulong* restrict buf,
     }
 }
 
-// FAIL immediate trap!
-#pragma GCC pop_options
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
 
 /*
  * Test memory using block moves 
@@ -1233,7 +1236,9 @@ void block_move(int iter, int me)
 
     // THINGS TO TRY:
     //  - zero out the rewritten addr_tst1 in case that's toxic
+    //    (it's not)
     //  - zero out the block_move_init in case that's toxic
+    //    (it's not)
 
 
     /* Initialize memory with the initial pattern.  */
@@ -1248,8 +1253,8 @@ void block_move(int iter, int me)
     sliced_foreach_segment(&ctx, me, block_move_move);
     { BAILR }
     s_barrier();
-    // FAIL:
-#if 0  // move me
+
+#if 1  // removing this doesn't fix the crash
 
     /* And check it. */
     sliced_foreach_segment(&ctx, me, block_move_check);
@@ -1258,7 +1263,7 @@ void block_move(int iter, int me)
 }
 
 // PASS! and again!
-//#pragma GCC pop_options
+#pragma GCC pop_options
 
 typedef struct {
     ulong pat;
