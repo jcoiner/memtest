@@ -216,7 +216,7 @@ static void run_at(unsigned long addr, int cpu)
 
     /* We use a lock to insure that only one CPU at a time jumps to
      * the new code. Some of the startup stuff is not thread safe! */
-    spin_lock(&barr->mutex);   
+    spin_lock(&barr->mutex);
 
     /* Jump to the start address */
     goto *ja;

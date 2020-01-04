@@ -12,10 +12,6 @@ Non-goals of this fork:
 
 ## TODO
 
- - Was getting errors in test 7 at what looked like maybe
-   the very highest (..0000) or lowest (..fffc) addresses in
-   some segments. huh? this was on the ryzen, bare metal.
-
  - Review to see if I've broken any of the ticks-counting logic,
    now that I see how fragile it is (doh!)
 
