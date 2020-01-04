@@ -75,7 +75,6 @@ short		onepass;
 volatile short	btflag = 0;
 volatile int	test;
 short	        restart_flag;
-bool	        reloc_pending = FALSE;
 uint8_t volatile stacks[MAX_CPUS][STACKSIZE_BYTES];
 int 		bitf_seq = 0;
 char		cmdline_parsed = 0;
@@ -253,20 +252,6 @@ switch_to_main_stack(unsigned cpu_num)
                           : /*no output*/
                           : "a" (offs) : "memory" 
                           );
-}
-
-void reloc_internal(int cpu)
-{
-    /* clear variables */
-    reloc_pending = FALSE;
-
-    run_at(LOW_TEST_ADR, cpu);
-}
-
-void reloc(void)
-{
-    bail++;
-    reloc_pending = TRUE;
 }
 
 /* command line passing using the 'old' boot protocol */
@@ -646,11 +631,6 @@ void test_start(void)
             }
             cprint(8, my_cpu_num+7, "-");
             btrace(my_cpu_num, __LINE__, "Sched_Win0",1,window,win_next);
-
-            /* Do we need to exit */
-            if(reloc_pending) {
-                reloc_internal(my_cpu_num);
-            }
 
             if (my_cpu_ord == mstr_cpu) {
                 switch (window) {
