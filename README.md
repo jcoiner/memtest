@@ -9,16 +9,12 @@ Non-goals of this fork:
  - Improve SMP support. It's still experimental as always. I have done most
    testing in single core mode.
 
+
 ## TODO
 
  - Was getting errors in test 7 at what looked like maybe
    the very highest (..0000) or lowest (..fffc) addresses in
    some segments. huh? this was on the ryzen, bare metal.
-
- - Why won't it start up on bare metal (thinkpad
-   or the ryzen box) when compiled with -O2?
-   * virtualbox is happy with -O2
-   * bare metal is happy if we build with -O1. hmm!
 
  - Review to see if I've broken any of the ticks-counting logic,
    now that I see how fragile it is (doh!)
