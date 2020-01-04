@@ -5,11 +5,11 @@ block_move.o:     file format elf32-i386
 Disassembly of section .text:
 
 00000000 <block_move>:
-   0:	f3 0f 1e fb          	endbr32 
-   4:	55                   	push   %ebp
-   5:	89 e5                	mov    %esp,%ebp
-   7:	53                   	push   %ebx
-   8:	83 ec 14             	sub    $0x14,%esp
+   0:	f3 0f 1e fb          	endbr32            // stray jump protection
+   4:	55                   	push   %ebp        // save caller's %ebp to osp-4
+   5:	89 e5                	mov    %esp,%ebp   // ebp = osp-4
+   7:	53                   	push   %ebx        // save caller's %ebx to osp-8
+   8:	83 ec 14             	sub    $0x14,%esp  // esp is now original esp - 0x1c
    b:	e8 fc ff ff ff       	call   c <block_move+0xc>
 			c: R_386_PC32	__x86.get_pc_thunk.bx
   10:	81 c3 02 00 00 00    	add    $0x2,%ebx
