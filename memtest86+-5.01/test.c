@@ -176,9 +176,6 @@ static void sliced_foreach_segment
 
 static void addr_tst1_seg(ulong* restrict buf,
                           ulong len_dw, const void* unused) {
-    // BOZO : short-circuiting this DOES NOT fix test 7
-    //if (len_dw > 0) { return; }
-
     // Within each segment:
     //  - choose a low dword offset 'off'
     //  - write pat to *off
@@ -1036,9 +1033,6 @@ void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
 #if 0
-    // JPC BOZO: This is no better for the test 7 interrupt
-    // than the assembly version.
-    // Removing this entirely doesn't help, either.
     for (ulong i = 0; i < size_in_dwords; i++)
         dest[i] = src[i];
 #else
@@ -1074,17 +1068,11 @@ ulong block_move_normalize_len_dw(ulong len_dw) {
     // be 64-byte aligned, it can be any dword.
     ulong result = (len_dw >> 5) << 5;
     ASSERT(result > 0);
-    // DEBUGF("normalize len_dw = 0x%x result = 0x%x\n", len_dw, result);
-    ASSERT(result <= len_dw);  // ?? bozo needed?
     return result;
 }
 
 static void block_move_init(ulong* restrict buf,
                             ulong len_dw, const void* unused_ctx) {
-    // JPC BOZO:
-    // short circuiting this DOES NOT fix the test 7 crash!
-    //if (len_dw > 0) { return; }
-
     len_dw = block_move_normalize_len_dw(len_dw);
 
     // Compute 'len' in units of 64-byte chunks:
@@ -1137,8 +1125,6 @@ typedef struct {
     int me;
 } block_move_ctx;
 
-// JPC BOZO: Q) does removing restrict from buf help?
-//           A) Nope, still an immediate trap
 static void block_move_move(ulong* restrict buf,
                             ulong len_dw, const void* vctx) {
     const block_move_ctx* restrict ctx = (const block_move_ctx*)vctx;
@@ -1191,9 +1177,6 @@ static void block_move_check(ulong* restrict buf,
     }
 }
 
-#if 0
-void block_move(int iter, int me);  // BOZO
-#else
 /*
  * Test memory using block moves 
  * Adapted from Robert Redelmeier's burnBX test
@@ -1219,7 +1202,6 @@ void block_move(int iter, int me)
     /* And check it. */
     sliced_foreach_segment(&ctx, me, block_move_check);
 }
-#endif
 
 typedef struct {
     ulong pat;
@@ -1318,8 +1300,6 @@ void sleep(long n, int flag, int me,
         }
     }
 }
-
-/* Beep function */
 
 void beep(unsigned int frequency)
 {

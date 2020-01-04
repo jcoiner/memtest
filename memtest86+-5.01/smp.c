@@ -78,7 +78,6 @@ void barrier()
 
 void s_barrier()
 {
-    return; // BOZO
     if (run_cpus == 1 || vv->fail_safe & 3) {
         return;
     }
