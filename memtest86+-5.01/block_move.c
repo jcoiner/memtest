@@ -21,7 +21,7 @@ void block_move_check(ulong* restrict buf,
                       ulong len_dw, const void* unused_ctx);
 
 #pragma GCC push_options
-//#pragma GCC optimize ("O0")
+#pragma GCC optimize ("O0")
 
 /*
  * Test memory using block moves 
@@ -129,18 +129,25 @@ void block_move(int iter, int me)
     //    A3) Why do we even get an .eh_frame section, and why
     //        is it completely different for opt vs noopt?
 
+    // Ugh, let's just find the shortest thing that'll crash
+    //  * opt, remove cprint, remove block_move_check: crash
+    //  * opt, remove both BAILRs: crash
+    //  * opt, remove the block_move_init and its s_barrier: crash
+    //    - noopt of same: no crash
+    //  * opt, remove the block_move_move, retain its s_barrier:
+    //    - no crash and runs extremely fast
+    //    - this is cutting too far
 
+#if 0
     /* Initialize memory with the initial pattern.  */
     sliced_foreach_segment(&ctx, me, block_move_init);
-    { BAILR }
+    //{ BAILR }
     s_barrier();
-
-    // PASS
-    //#if 0  // move me
+#endif
 
     /* Now move the data around */
     sliced_foreach_segment(&ctx, me, block_move_move);
-    { BAILR }
+    //{ BAILR }
     s_barrier();
 
 #if 0  // removing this doesn't fix the crash

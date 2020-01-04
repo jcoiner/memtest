@@ -1,0 +1,41 @@
+
+block_move.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 <block_move>:
+   0:	f3 0f 1e fb          	endbr32 
+   4:	53                   	push   %ebx
+   5:	83 ec 1c             	sub    $0x1c,%esp
+   8:	e8 fc ff ff ff       	call   9 <block_move+0x9>
+			9: R_386_PC32	__x86.get_pc_thunk.bx
+   d:	81 c3 02 00 00 00    	add    $0x2,%ebx
+			f: R_386_GOTPC	_GLOBAL_OFFSET_TABLE_
+  13:	8b 44 24 28          	mov    0x28(%esp),%eax
+  17:	8b 54 24 24          	mov    0x24(%esp),%edx
+  1b:	89 54 24 0c          	mov    %edx,0xc(%esp)
+  1f:	89 44 24 10          	mov    %eax,0x10(%esp)
+  23:	ff b3 00 00 00 00    	pushl  0x0(%ebx)
+			25: R_386_GOT32	block_move_move
+  29:	50                   	push   %eax
+  2a:	8d 44 24 14          	lea    0x14(%esp),%eax
+  2e:	50                   	push   %eax
+  2f:	e8 fc ff ff ff       	call   30 <block_move+0x30>
+			30: R_386_PLT32	sliced_foreach_segment
+  34:	e8 fc ff ff ff       	call   35 <block_move+0x35>
+			35: R_386_PLT32	s_barrier
+  39:	83 c4 28             	add    $0x28,%esp
+  3c:	5b                   	pop    %ebx
+  3d:	c3                   	ret    
+  3e:	66 90                	xchg   %ax,%ax
+
+00000040 <fooff>:
+  40:	f3 0f 1e fb          	endbr32 
+  44:	c3                   	ret    
+
+Disassembly of section .text.__x86.get_pc_thunk.bx:
+
+00000000 <__x86.get_pc_thunk.bx>:
+   0:	8b 1c 24             	mov    (%esp),%ebx
+   3:	c3                   	ret    
