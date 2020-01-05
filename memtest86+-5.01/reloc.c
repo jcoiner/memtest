@@ -13,12 +13,9 @@
 
 /* We use this macro to refer to ELF types independent of the native wordsize.
    `ElfW(TYPE)' is used in place of `Elf32_TYPE' or `Elf64_TYPE'.  */
-
 #define ElfW(type)	_ElfW (Elf, __ELF_NATIVE_CLASS, type)
 #define _ElfW(e,w,t)	_ElfW_1 (e, w, _##t)
 #define _ElfW_1(e,w,t)	e##w##t
-/* We use this macro to refer to ELF types independent of the native wordsize.
-   `ElfW(TYPE)' is used in place of `Elf32_TYPE' or `Elf64_TYPE'.  */
 #define ELFW(type)	_ElfW (ELF, __ELF_NATIVE_CLASS, type)
 
 static inline void __attribute__ ((unused))
@@ -62,14 +59,14 @@ struct link_map {
    first element of the GOT.  This must be inlined in a function which
    uses global data.  */
 static inline Elf32_Addr __attribute__ ((unused))
-elf_machine_dynamic (void) {
+elf_machine_dynamic(void) {
     register Elf32_Addr *got asm ("%ebx");
     return *got;
 }
 
 /* Return the run-time load address of the shared object.  */
 static inline Elf32_Addr __attribute__ ((unused))
-elf_machine_load_address (void) {
+elf_machine_load_address(void) {
     Elf32_Addr addr;
     asm volatile ("leal _start@GOTOFF(%%ebx), %0\n"
                   : "=r" (addr) : : "cc");
@@ -79,8 +76,8 @@ elf_machine_load_address (void) {
 /* Perform the relocation specified by RELOC and SYM (which is fully resolved).
    MAP is the object containing the reloc.  */
 static inline void
-elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
-		 const Elf32_Sym *sym, Elf32_Addr *const reloc_addr) {
+elf_machine_rel(struct link_map *map, const Elf32_Rel *reloc,
+                const Elf32_Sym *sym, Elf32_Addr *const reloc_addr) {
     Elf32_Addr ls_addr, s_addr;
     Elf32_Addr value;
     if (ELF32_R_TYPE (reloc->r_info) == R_386_RELATIVE)
@@ -195,8 +192,8 @@ elf_get_dynamic_info(ElfW(Dyn) *dyn, ElfW(Addr) l_addr,
    than fully resolved now.  */
 
 static inline void
-elf_dynamic_do_rel (struct link_map *map,
-		    ElfW(Addr) reladdr, ElfW(Addr) relsize) {
+elf_dynamic_do_rel(struct link_map *map,
+                   ElfW(Addr) reladdr, ElfW(Addr) relsize) {
     const ElfW(Rel) *r = (const void *) reladdr;
     const ElfW(Rel) *end = (const void *) (reladdr + relsize);
 

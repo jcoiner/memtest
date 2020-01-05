@@ -12,16 +12,19 @@ Non-goals of this fork:
 
 ## TODO
 
- - Review to see if I've broken any of the ticks-counting logic,
-   now that I see how fragile it is (doh!)
-
  - Apply the rest of the ubuntu/debian patches.
    Get in touch with distro maintainers. what's the next step?
 
- - Test SMP a little bit, ensure it's not borked. Getting SMP fully
-   stable is not a goal but let's not make it worse.
+ - Attempt to update reloc.c from a recent glibc that knows how
+   to relocate more ELF section types. I suspect we aren't completely
+   relocating everything we need to; see comment on the STATIC
+   macro defined in test.c
+
+ - Test SMP a little. Getting SMP fully stable is not a goal, it's
+   still experimental, but let's not make it worse.
 
  - Update the version number to 6.0. Where does the 5.01 print from?
+
 
 ## Changes since 5.01
 
