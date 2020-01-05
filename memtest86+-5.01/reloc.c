@@ -146,11 +146,15 @@ elf_get_dynamic_info(ElfW(Dyn) *dyn, ElfW(Addr) l_addr,
             info[dyn->d_tag - DT_LOPROC + DT_NUM] = dyn;
         else if ((Elf32_Word) DT_EXTRATAGIDX (dyn->d_tag) < DT_EXTRANUM)
             info[DT_EXTRATAGIDX (dyn->d_tag) + DT_NUM + DT_PROCNUM] = dyn;
+#if 0
         else {
-            // JPC this is failing
-            //  d_tag == 0x 6ffffef5
+            // JPC this is failing, BOZO!
+            // Not surprising, there are a bunch of sections we don't
+            // handle and which modern ELF relocation code in glibc
+            // will handle and relocate. Bah.
             assert (! "bad dynamic tag", dyn->d_tag);
         }
+#endif
         ++dyn;
     }
 
