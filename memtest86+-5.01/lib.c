@@ -788,7 +788,7 @@ void ttyprint(int y, int x, const char *p)
 {
     static char sx[3];
     static char sy[3];
-	
+
     sx[0]='\0';
     sy[0]='\0';
     x++; y++;
