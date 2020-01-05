@@ -136,6 +136,10 @@ void movinvr(int cpu);
 void movinv32(int iter, ulong p1, ulong lb, ulong mb, int sval, int off,
 	int cpu);
 void modtst(int off, int iter, ulong p1, ulong p2, int cpu);
+#define ASSERT(n) do {                   \
+    if (!(n)) {                          \
+        assert_fail(__FILE__, __LINE__); \
+    } } while(0)
 void assert_fail(const char* file, int line_no);
 void mt86_error(ulong* adr, ulong good, ulong bad);
 void ad_err1(ulong *adr1, ulong *adr2, ulong good, ulong bad);

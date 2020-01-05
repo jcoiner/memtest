@@ -35,11 +35,6 @@ static inline ulong roundup(ulong value, ulong mask)
     return (value + mask) & ~mask;
 }
 
-#define ASSERT(n) do {                   \
-    if (!(n)) {                          \
-        assert_fail(__FILE__, __LINE__); \
-    } } while(0);
-
 // Writes *start and *end with the VA range to test.
 //
 // me - this threads CPU number
