@@ -23,7 +23,7 @@ OBJS= head.o reloc.o main.o test.o init.o lib.o patn.o screen_buffer.o \
 
 SELF_TEST_OBJS = test.o self_test.o cpuid.o random.o
 
-all: memtest.bin memtest self_test run_self_test
+all: clean memtest.bin memtest self_test run_self_test
 
 run_self_test : self_test
 	./self_test && touch run_self_test
