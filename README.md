@@ -22,6 +22,13 @@ Non-goals of this fork:
 
  - Test SMP a little. Getting SMP fully stable is not a goal, it's
    still experimental, but let's not make it worse.
+   * works fine in VBox
+   * it's not the reloc.c assert, removing that doesn't help
+   * try removing addr_tst1 and also the sole ASSERT
+     in main.c
+     - no luck, still hangs
+
+
 
  - Update the version number to 6.0. Where does the 5.01 print from?
 
@@ -80,8 +87,8 @@ Non-goals of this fork:
    compete with manual assembly.
 
  - Rewrite test 1 (addr_tst1) to fix a bug. Before, it could possibly
-   write to stray addresses that aren't mapped to DRAM (and could be
-   mapped to hardware devices. Uh oh!) The simplified test combines
+   write to stray addresses that aren't mapped to DRAM -- and could be
+   mapped to hardware devices, uh oh! The simplified test combines
    the unbanked and banked modes, since the banked mode pretty much
    covered the unbanked mode. It uses the foreach_segment() routine
    and dword-indexed-based loop tests to avoid overflows.

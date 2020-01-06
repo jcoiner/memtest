@@ -40,11 +40,6 @@ void poll_errors();
 
 static const void* const nullptr = 0x0;
 
-static inline ulong roundup(ulong value, ulong mask)
-{
-    return (value + mask) & ~mask;
-}
-
 // Writes *start and *end with the VA range to test.
 //
 // me - this threads CPU number

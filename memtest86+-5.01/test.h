@@ -261,11 +261,11 @@ struct pmap {
 };
 
 struct tseq {
-    short sel;
-    short cpu_sel;
-    short pat;
-    short iter;
-    short errors;
+    short sel;     // enabled
+    short cpu_sel; // cpu_sel == 0 indicates end of tseq[] array
+    short pat;     // the test #
+    short iter;    // # of iterations to run
+    short errors;  // error count, updated as tests run
     char *msg;
 };
 
@@ -278,7 +278,7 @@ struct err_info {
     struct xadr   low_addr;
     struct xadr   high_addr;
     unsigned long ebits;
-    long	      tbits;
+    long          tbits;
     short         min_bits;
     short         max_bits;
     unsigned long maxl;
