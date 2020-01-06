@@ -33,7 +33,11 @@ Non-goals of this fork:
      - that reduces the search space a lot
        (assuming 5.01 stock still works)
 
-
+   * try with full old 5.01, does it work on this host?
+     - NO!
+     - the failure mode is a little different: v5.01 hangs,
+       the new one reboots the machine. Neither works though.
+     - given that it works in VBox, let's say SMP mode is OK.
 
  - Update the version number to 6.0. Where does the 5.01 print from?
 
