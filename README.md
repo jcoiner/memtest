@@ -20,7 +20,7 @@ Non-goals of this fork:
    relocating everything we need to; see comment on the STATIC
    macro defined in test.c
 
- - Update the version number to 6.0. Where does the 5.01 print from?
+ - Update the version number to 6.0
 
 
 ## Changes since 5.01
@@ -66,9 +66,8 @@ Non-goals of this fork:
    also fails the new one with the same failure mode, as expected.
 
  - In test 10 (modtst) replace assembly with C. It had to be modified to
-   work with the new loop bounds logic. I was less confident in my ability
-   to modify assembly. GCC's output looks just as tight as the handwritten
-   assembly.
+   work with the new loop bounds logic. GCC's output looks just as tight
+   as the handwritten assembly.
 
    Side note: we're compiling test.c with -O1 now. Someone had knocked it
    down to -O0 in 5.01 (why? to make the assembly look better? to
@@ -76,7 +75,7 @@ Non-goals of this fork:
    things are working well at -O1 now, which helps the compiler to
    compete with manual assembly.
 
- - Rewrite test 1 (addr_tst1) to fix a bug. Before, it could possibly
+ - Rewrite test 1 (addr\_tst1) to fix a bug. Before, it could possibly
    write to stray addresses that aren't mapped to DRAM -- and could be
    mapped to hardware devices, uh oh! The simplified test combines
    the unbanked and banked modes, since the banked mode pretty much
