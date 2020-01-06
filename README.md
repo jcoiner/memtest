@@ -6,8 +6,8 @@ readability while doing no harm to performance and coverage.
 Non-goals of this fork:
  - Support UEFI
  - Build as a 64-bit binary
- - Improve SMP support. It's still experimental as always. I have done most
-   testing in single core mode.
+ - Stabilize SMP support. SMP remains experimental, and I've mostly
+   tested in single core mode.
 
 
 ## TODO
@@ -19,25 +19,6 @@ Non-goals of this fork:
    to relocate more ELF section types. I suspect we aren't completely
    relocating everything we need to; see comment on the STATIC
    macro defined in test.c
-
- - Test SMP a little. Getting SMP fully stable is not a goal, it's
-   still experimental, but let's not make it worse.
-   * works fine in VBox
-   * it's not the reloc.c assert, removing that doesn't help
-   * try removing addr_tst1 and also the sole ASSERT
-     in main.c
-     - no luck, still hangs
-   * try with the old (5.01) test.c
-     since its API hasn't changed at all
-     - no luck, still hangs
-     - that reduces the search space a lot
-       (assuming 5.01 stock still works)
-
-   * try with full old 5.01, does it work on this host?
-     - NO!
-     - the failure mode is a little different: v5.01 hangs,
-       the new one reboots the machine. Neither works though.
-     - given that it works in VBox, let's say SMP mode is OK.
 
  - Update the version number to 6.0. Where does the 5.01 print from?
 
