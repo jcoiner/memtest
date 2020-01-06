@@ -27,6 +27,11 @@ Non-goals of this fork:
    * try removing addr_tst1 and also the sole ASSERT
      in main.c
      - no luck, still hangs
+   * try with the old (5.01) test.c
+     since its API hasn't changed at all
+     - no luck, still hangs
+     - that reduces the search space a lot
+       (assuming 5.01 stock still works)
 
 
 
