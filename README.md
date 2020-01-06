@@ -3,11 +3,13 @@
 Fork of memtest86+ 5.01. Improves its correctness, code health, and code
 readability while doing no harm to performance and coverage.
 
-Non-goals of this fork:
- - Support UEFI
- - Build as a 64-bit binary
- - Stabilize SMP support. SMP remains experimental, and I've mostly
-   tested in single core mode.
+NON-goals of this fork:
+ - Support UEFI.
+ - Build a 64-bit binary.
+ - Stabilize SMP support. SMP remains experimental.
+ - Hardware detection: reporting SPD and DMI metadata, or any controller-
+   specific metadata is orthogonal to actually testing the memory. Such
+   functionality can only break or go out-of-date.
 
 
 ## TODO
@@ -18,7 +20,7 @@ Non-goals of this fork:
  - Attempt to update reloc.c from a recent glibc that knows how
    to relocate more ELF section types. I suspect we aren't completely
    relocating everything we need to; see comment on the STATIC
-   macro defined in test.c
+   macro in test.c.
 
  - Update the version number to 6.0
 
@@ -30,14 +32,15 @@ Non-goals of this fork:
    dword index, 4k page index, and so on.
 
  - Add an ASSERT() macro for validating assumptions. Prints a message
-   in yellow (not red) to distinguish asserts from memory errors.
+   in yellow to distinguish asserts from memory errors (printed in red.)
 
  - Add a unit test for the core memtest86+ routines in test.c. The
    "self_test" allows running these routines in gdb or adding debug
    prints. Prod code can use the DEBUGF macro to print messages.
 
-   The unit test does not yet support SMP or error injection. It does
-   cover all the major test routines. You need a 32-bit libc (sorry.)
+   The self\_test does not yet support SMP or error injection. It does
+   cover all the major test routines. You need a 32-bit libc to build
+   the self_test (sorry.)
 
  - Clean up the duplicative and brittle loop tests in test.c. There were
    address-dependent bugs here, eg. they would only manifest if a segment
