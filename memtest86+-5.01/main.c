@@ -394,6 +394,13 @@ void test_start(void)
 
         /* These steps are only done by the boot cpu */
         if (my_cpu_num == 0) {
+            // JPC: We haven't used vv yet, take the opportunity
+            // to fully clear it.
+#if 0
+            for (int i = 0; i < sizeof(*vv); i++) {
+                *(((char*)vv)+i) = 0;
+            }
+#endif
             my_cpu_ord = cpu_ord++;
             smp_set_ordinal(my_cpu_num, my_cpu_ord);
             parse_command_line();
