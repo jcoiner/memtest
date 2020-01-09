@@ -62,16 +62,6 @@ NON-goals of this fork:
  - Indent consistently. Replace tab characters with spaces so the code will
    render the same for everyone (the jwz standard.)
 
- - In test 10 (modtst) replace assembly with C. It had to be modified to
-   work with the new loop bounds logic. GCC's output looks just as tight
-   as the handwritten assembly.
-
-   Side note: we're compiling test.c with -O1 now. Someone had knocked it
-   down to -O0 in 5.01 (why? to make the assembly look better? to
-   work around one of the many bugs that are now fixed?) In any event,
-   things are working well at -O1 now, which helps the compiler to
-   compete with manual assembly.
-
  - Rewrite test 1 (addr\_tst1) to fix a bug. Before, it could possibly
    write to stray addresses that aren't mapped to DRAM -- and could be
    mapped to hardware devices, uh oh! The simplified test combines
