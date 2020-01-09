@@ -38,6 +38,8 @@ void poll_errors();
 #define STATIC static
 //#define STATIC
 
+#define PREFER_C 0
+
 static const void* const nullptr = 0x0;
 
 // Writes *start and *end with the VA range to test.
@@ -830,7 +832,7 @@ STATIC void movinv32_top_down(ulong* restrict buf,
     k++;
 
     /* Original C code replaced with hand tuned assembly code */
-#if 0
+#if PREFER_C
     ulong bad;
     while(1) {
         if ((bad=*p) != ~pat) {
@@ -958,9 +960,26 @@ STATIC void modtst_sparse_writes(ulong* restrict start,
     ulong p1 = ctx->p1;
     ulong offset = ctx->offset;
 
+#if PREFER_C
     for (ulong i = offset; i < len_dw; i += MOD_SZ) {
         start[i] = p1;
     }
+#else
+    ulong* p = start + offset;
+    ulong* pe = start + len_dw;
+    asm __volatile__
+        (
+         "jmp L60\n\t"
+         ".p2align 4,,7\n\t"
+
+         "L60:\n\t"
+         "movl %%eax,(%%edi)\n\t"
+         "addl $80,%%edi\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L60\n\t"
+         :: "D" (p), "d" (pe), "a" (p1)
+         );
+#endif
 }
 
 STATIC void modtst_dense_writes(ulong* restrict start, ulong len_dw,
@@ -972,6 +991,7 @@ STATIC void modtst_dense_writes(ulong* restrict start, ulong len_dw,
     ASSERT(offset < MOD_SZ);
 
     ulong k = 0;
+#if PREFER_C
     for (ulong i = 0; i < len_dw; i++) {
         if (k != offset) {
             start[i] = p2;
@@ -980,6 +1000,31 @@ STATIC void modtst_dense_writes(ulong* restrict start, ulong len_dw,
             k = 0;
         }
     }
+#else
+    ulong* pe = start + (len_dw - 1);
+    asm __volatile__
+        (
+         "jmp L50\n\t"
+         ".p2align 4,,7\n\t"
+
+         "L54:\n\t"
+         "addl $4,%%edi\n\t"
+         "L50:\n\t"
+         "cmpl %%ebx,%%ecx\n\t"
+         "je L52\n\t"
+         "movl %%eax,(%%edi)\n\t"
+         "L52:\n\t"
+         "incl %%ebx\n\t"
+         "cmpl $19,%%ebx\n\t"
+         "jle L53\n\t"
+         "xorl %%ebx,%%ebx\n\t"
+         "L53:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L54\n\t"
+         : : "D" (start), "d" (pe), "a" (p2),
+           "b" (k), "c" (offset)
+         );
+#endif
 }
 
 STATIC void modtst_check(ulong* restrict start,
@@ -990,11 +1035,47 @@ STATIC void modtst_check(ulong* restrict start,
 
     ASSERT(offset < MOD_SZ);
 
+#if PREFER_C
     ulong bad;
     for (ulong i = offset; i < len_dw; i += MOD_SZ) {
         if ((bad = start[i]) != p1)
             mt86_error(start + i, p1, bad);
     }
+#else
+    ulong* p = start + offset;
+    ulong* pe = start + len_dw;
+    asm __volatile__
+        (
+         "jmp L70\n\t"
+         ".p2align 4,,7\n\t"
+
+         "L70:\n\t"
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl %%eax,%%ecx\n\t"
+         "jne L71\n\t"
+         "L72:\n\t"
+         "addl $80,%%edi\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L70\n\t"
+         "jmp L73\n\t"
+
+         "L71:\n\t"
+         "pushl %%edx\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%eax\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "popl %%eax\n\t"
+         "popl %%ecx\n\t"
+         "popl %%edx\n\t"
+         "jmp L72\n"
+
+         "L73:\n\t"
+         : : "D" (p), "d" (pe), "a" (p1)
+         : "ecx"
+         );
+#endif
 }
 
 /*
@@ -1028,13 +1109,22 @@ void modtst(int offset, int iter, ulong p1, ulong p2, int me)
     sliced_foreach_segment(&ctx, me, modtst_check);
 }
 
-void movsl(ulong* dest,
+#if PREFER_C
+
+STATIC void movsl(ulong* dest,
            ulong* src,
            ulong size_in_dwords) {
-#if 0
+    /* Logically equivalent to:
+
     for (ulong i = 0; i < size_in_dwords; i++)
         dest[i] = src[i];
-#else
+
+    However: the movsl instruction does the entire loop
+    in one instruction -- this is probably how 'memcpy'
+    is implemented -- so hardware makes it very fast.
+
+    Even in PREFER_C mode, we want the brute force of movsl!
+    */
     asm __volatile__
         (
          "cld\n"
@@ -1052,10 +1142,10 @@ void movsl(ulong* dest,
          :: "g" (src), "g" (dest), "g" (size_in_dwords)
          : "edi", "esi", "ecx"
          );
-#endif
 }
+#endif  // PREFER_C
 
-ulong block_move_normalize_len_dw(ulong len_dw) {
+STATIC ulong block_move_normalize_len_dw(ulong len_dw) {
     // The block_move test works with sets of 64-byte blocks,
     // so ensure our total length is a multiple of 64.
     //
@@ -1082,7 +1172,7 @@ STATIC void block_move_init(ulong* restrict buf,
     len = len >> 1;
 
     ulong base_val = 1;
-#if 0
+#if PREFER_C
     while(len > 0) {
         ulong neg_val = ~base_val;
 
@@ -1195,7 +1285,7 @@ STATIC void block_move_move(ulong* restrict buf,
         }
         { BAILR }
 
-#if 0
+#if PREFER_C
         // Move first half to 2nd half:
         movsl(/*dest=*/ mid, /*src=*/ buf, half_len_dw);
 
@@ -1259,7 +1349,7 @@ STATIC void block_move_check(ulong* restrict buf,
      * This is rather crude, we just check that the
      * adjacent words are the same.
      */
-#if 0
+#if PREFER_C
     for (ulong i = 0; i < len_dw; i = i + 2) {
         if (buf[i] != buf[i+1]) {
             mt86_error(buf+i, buf[i], buf[i+1]);
