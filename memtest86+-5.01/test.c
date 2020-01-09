@@ -1082,6 +1082,7 @@ STATIC void block_move_init(ulong* restrict buf,
     len = len >> 1;
 
     ulong base_val = 1;
+#if 0
     while(len > 0) {
         ulong neg_val = ~base_val;
 
@@ -1117,6 +1118,52 @@ STATIC void block_move_init(ulong* restrict buf,
             base_val = base_val << 1;
         }
     }
+#else
+    asm __volatile__
+        (
+         "jmp L100\n\t"
+
+         ".p2align 4,,7\n\t"
+         "L100:\n\t"
+
+         // First loop eax is 0x00000001, edx is 0xfffffffe
+         "movl %%eax, %%edx\n\t"
+         "notl %%edx\n\t"
+
+         // Set a block of 64-bytes	// First loop DWORDS are 
+         "movl %%eax,0(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,4(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,8(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,12(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,16(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,20(%%edi)\n\t"	// 0xfffffffe
+         "movl %%eax,24(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,28(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,32(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,36(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,40(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,44(%%edi)\n\t"	// 0xfffffffe
+         "movl %%eax,48(%%edi)\n\t"	// 0x00000001
+         "movl %%eax,52(%%edi)\n\t"	// 0x00000001
+         "movl %%edx,56(%%edi)\n\t"	// 0xfffffffe
+         "movl %%edx,60(%%edi)\n\t"	// 0xfffffffe
+
+         // rotate left with carry, 
+         // second loop eax is		 0x00000002
+         // second loop edx is (~eax) 0xfffffffd
+         "rcll $1, %%eax\n\t"		
+			
+         // Move current position forward 64-bytes (to start of next block)
+         "leal 64(%%edi), %%edi\n\t"
+
+         // Loop until end
+         "decl %%ecx\n\t"
+         "jnz  L100\n\t"
+
+         : : "D" (buf), "c" (len), "a" (base_val)
+         : "edx"
+         );
+#endif
 }
 
 typedef struct {
@@ -1148,6 +1195,7 @@ STATIC void block_move_move(ulong* restrict buf,
         }
         { BAILR }
 
+#if 0
         // Move first half to 2nd half:
         movsl(/*dest=*/ mid, /*src=*/ buf, half_len_dw);
 
@@ -1158,6 +1206,48 @@ STATIC void block_move_move(ulong* restrict buf,
         // Finally, move the last 8 dwords of the 2nd half
         // to the first 8 dwords of the first half.
         movsl(/*dest=*/ mid + half_len_dw - 8, /*src=*/ buf, 8);
+#else
+        asm __volatile__
+            (
+             "cld\n"
+             "jmp L110\n\t"
+
+             ".p2align 4,,7\n\t"
+             "L110:\n\t"
+
+             //
+             // At the end of all this 
+             // - the second half equals the inital value of the first half
+             // - the first half is right shifted 32-bytes (with wrapping)
+             //
+
+             // Move first half to second half
+             "movl %1,%%edi\n\t" // Destination 'mid' (mid point)
+             "movl %0,%%esi\n\t" // Source, 'buf' (start point)
+             "movl %2,%%ecx\n\t" // Length, 'half_len_dw' (size of a half in DWORDS)
+             "rep\n\t"
+             "movsl\n\t"
+
+             // Move the second half, less the last 32-bytes. To the first half, offset plus 32-bytes
+             "movl %0,%%edi\n\t"
+             "addl $32,%%edi\n\t"   // Destination 'buf' plus 32 bytes
+             "movl %1,%%esi\n\t"    // Source, 'mid'
+             "movl %2,%%ecx\n\t"
+             "subl $8,%%ecx\n\t"    // Length, 'half_len_dw'
+             "rep\n\t"
+             "movsl\n\t"
+
+             // Move last 8 DWORDS (32-bytes) of the second half to the start of the first half
+             "movl %0,%%edi\n\t"    // Destination 'buf'
+             // Source, 8 DWORDS from the end of the second half, left over by the last rep/movsl
+             "movl $8,%%ecx\n\t"    // Length, 8 DWORDS (32-bytes)
+             "rep\n\t"
+             "movsl\n\t"
+
+             :: "g" (buf), "g" (mid), "g" (half_len_dw)
+             : "edi", "esi", "ecx"
+             );
+#endif        
     }
 }
 
@@ -1169,11 +1259,51 @@ STATIC void block_move_check(ulong* restrict buf,
      * This is rather crude, we just check that the
      * adjacent words are the same.
      */
+#if 0
     for (ulong i = 0; i < len_dw; i = i + 2) {
         if (buf[i] != buf[i+1]) {
             mt86_error(buf+i, buf[i], buf[i+1]);
         }
     }
+#else
+    ulong* pe = buf + (len_dw - 2);
+    asm __volatile__
+        (
+         "jmp L120\n\t"
+
+         ".p2align 4,,7\n\t"
+         "L124:\n\t"
+         "addl $8,%%edi\n\t" // Next QWORD
+         "L120:\n\t"
+
+         // Compare adjacent DWORDS
+         "movl (%%edi),%%ecx\n\t"
+         "cmpl 4(%%edi),%%ecx\n\t"
+         "jnz L121\n\t" // Print error if they don't match
+
+         // Loop until end of block
+         "L122:\n\t"
+         "cmpl %%edx,%%edi\n\t"
+         "jb L124\n"
+         "jmp L123\n\t"
+
+         "L121:\n\t"
+         // eax not used so we don't need to save it as per cdecl
+         // ecx is used but not restored, however we don't need it's value anymore after this point
+         "pushl %%edx\n\t"
+         "pushl 4(%%edi)\n\t"
+         "pushl %%ecx\n\t"
+         "pushl %%edi\n\t"
+         "call mt86_error\n\t"
+         "popl %%edi\n\t"
+         "addl $8,%%esp\n\t"
+         "popl %%edx\n\t"
+         "jmp L122\n"
+         "L123:\n\t"
+         :: "D" (buf), "d" (pe)
+         : "ecx"
+         );
+#endif
 }
 
 /*

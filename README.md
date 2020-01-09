@@ -62,12 +62,6 @@ NON-goals of this fork:
  - Indent consistently. Replace tab characters with spaces so the code will
    render the same for everyone (the jwz standard.)
 
- - In test 7 (block moves) replace assembly with C for everything except
-   the 'movsl' instruction that does all the real work of this test.
-   The rewritten test performs within a measurement error of the original.
-   I have a flaky machine which fails the original block_move test, and it
-   also fails the new one with the same failure mode, as expected.
-
  - In test 10 (modtst) replace assembly with C. It had to be modified to
    work with the new loop bounds logic. GCC's output looks just as tight
    as the handwritten assembly.
