@@ -91,7 +91,7 @@ typedef void(*segment_fn)(ulong* start,  // start address
 /* Call segment_fn() for each up-to-SPINSZ segment between
  * 'start' and 'end'.
  */
-void foreach_segment
+STATIC void foreach_segment
 (ulong* start, ulong* end,
  int me, const void* ctx, segment_fn func) {
 
