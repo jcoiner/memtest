@@ -13,15 +13,31 @@
 
 /* We use this macro to refer to ELF types independent of the native wordsize.
    `ElfW(TYPE)' is used in place of `Elf32_TYPE' or `Elf64_TYPE'.  */
-
 #define ElfW(type)	_ElfW (Elf, __ELF_NATIVE_CLASS, type)
 #define _ElfW(e,w,t)	_ElfW_1 (e, w, _##t)
 #define _ElfW_1(e,w,t)	e##w##t
-/* We use this macro to refer to ELF types independent of the native wordsize.
-   `ElfW(TYPE)' is used in place of `Elf32_TYPE' or `Elf64_TYPE'.  */
 #define ELFW(type)	_ElfW (ELF, __ELF_NATIVE_CLASS, type)
 
-#define assert(expr) ((void) 0)
+static inline void __attribute__ ((unused))
+fail_assert(unsigned line_num, unsigned code) {
+    // Put line num in low bits of %edx and a sentinel in the high bits.
+    line_num |= 0xEEEC0000;  // eek!
+    asm __volatile__ ("movl %%edx, %%edx"
+                      : "=d"(line_num), "=c" (code)
+                      : "d" (line_num), "c"  (code));
+
+    // Now observe %edx and %ecx in a virtual machine's debugger.
+    // Have a nice day.
+    while(1) {}
+
+    // It would be nice if we could print a message here
+    // (even though we don't have function calls yet) before
+    // entering the infinite loop.
+}
+
+#define assert(expr, code) do {                        \
+        if (!(expr)) { fail_assert(__LINE__, code); }  \
+    } while(0)
 
   /* This #define produces dynamic linking inline functions for
      bootstrap relocation instead of general-purpose relocation.  */
@@ -35,8 +51,6 @@ struct link_map
     /* Indexed pointers to dynamic section.
        [0,DT_NUM) are indexed by the processor-independent tags.
        [DT_NUM,DT_NUM+DT_PROCNUM) are indexed by the tag minus DT_LOPROC.
-       [DT_NUM+DT_PROCNUM,DT_NUM+DT_PROCNUM+DT_EXTRANUM) are indexed
-       by DT_EXTRATAGIDX(tagvalue) and
        [DT_NUM+DT_PROCNUM,
         DT_NUM+DT_PROCNUM+DT_EXTRANUM)
        are indexed by DT_EXTRATAGIDX(tagvalue) (see <elf.h>).  */
@@ -119,7 +133,7 @@ elf_machine_rel (struct link_map *map, const Elf32_Rel *reloc,
 		*reloc_addr += (s_addr - map->l_addr) - (ls_addr - map->ll_addr);
 		break;
 	default:
-		assert (! "unexpected dynamic reloc type");
+		assert (! "unexpected dynamic reloc type", 0);
 		break;
 	}
 }
@@ -143,8 +157,17 @@ elf_get_dynamic_info(ElfW(Dyn) *dyn, ElfW(Addr) l_addr,
 		else if ((Elf32_Word) DT_EXTRATAGIDX (dyn->d_tag) < DT_EXTRANUM)
 			info[DT_EXTRATAGIDX (dyn->d_tag) + DT_NUM + DT_PROCNUM
 				] = dyn;
-		else
+		else {
+#if 0
+			// WARNING! This fails with code emitted by modern gcc.
+			// There are section tags we don't handle -- some of
+			// which should be relocated.
+			//
+			// TODO: update reloc.c from modern ELF relocation
+			// code in glibc, and reenable the assert.
 			assert (! "bad dynamic tag");
+#endif
+		}
 		++dyn;
 	}
 	
@@ -157,26 +180,26 @@ elf_get_dynamic_info(ElfW(Dyn) *dyn, ElfW(Addr) l_addr,
 #if ! ELF_MACHINE_NO_RELA
 	if (info[DT_RELA] != NULL)
 	{
-		assert (info[DT_RELAENT]->d_un.d_val == sizeof (ElfW(Rela)));
+		assert (info[DT_RELAENT]->d_un.d_val == sizeof (ElfW(Rela)), 0);
 		info[DT_RELA]->d_un.d_ptr += l_addr;
 	}
 #endif
 #if ! ELF_MACHINE_NO_REL
 	if (info[DT_REL] != NULL)
 	{
-		assert (info[DT_RELENT]->d_un.d_val == sizeof (ElfW(Rel)));
+		assert (info[DT_RELENT]->d_un.d_val == sizeof (ElfW(Rel)), 0);
 		info[DT_REL]->d_un.d_ptr += l_addr;
 	}
 #endif
 	if (info[DT_PLTREL] != NULL)
 	{
 #if ELF_MACHINE_NO_RELA
-		assert (info[DT_PLTREL]->d_un.d_val == DT_REL);
+		assert (info[DT_PLTREL]->d_un.d_val == DT_REL, 0);
 #elif ELF_MACHINE_NO_REL
-		assert (info[DT_PLTREL]->d_un.d_val == DT_RELA);
+		assert (info[DT_PLTREL]->d_un.d_val == DT_RELA, 0);
 #else
 		assert (info[DT_PLTREL]->d_un.d_val == DT_REL
-			|| info[DT_PLTREL]->d_un.d_val == DT_RELA);
+			|| info[DT_PLTREL]->d_un.d_val == DT_RELA, 0);
 #endif
 	}
 	if (info[DT_JMPREL] != NULL)

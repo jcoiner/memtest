@@ -1,0 +1,7 @@
+*.o
+*.s
+*.bin
+*~
+*.iso
+memtest
+memtest_shared

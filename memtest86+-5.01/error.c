@@ -50,10 +50,10 @@ void assert_fail(const char* file, int line_no) {
      spin_lock(&barr->mutex);
 
      scroll();
-     cprint(vv->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
-     dprint(vv->msg_line, 31, line_no, 5, 1);
-     cprint(vv->msg_line, 37, file);
-     paint_line(vv->msg_line, 0x0E /* yellow on black */);
+     cprint(v->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
+     dprint(v->msg_line, 31, line_no, 5, 1);
+     cprint(v->msg_line, 37, file);
+     paint_line(v->msg_line, 0x0E /* yellow on black */);
 
      spin_unlock(&barr->mutex);
 
@@ -158,9 +158,9 @@ static void print_err_counts(void)
 
 	/* Paint the error messages on the screen red to provide a vivid */
 	/* indicator that an error has occured */ 
-	if (vv->printmode == PRINTMODE_ADDRESSES ||
-	    vv->printmode == PRINTMODE_PATTERNS) {
-		paint_line(vv->msg_line, 0x47 /* gray on red */);
+	if (v->printmode == PRINTMODE_ADDRESSES ||
+	    v->printmode == PRINTMODE_PATTERNS) {
+		paint_line(v->msg_line, 0x47 /* gray on red */);
 	}
 }
 

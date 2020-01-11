@@ -1046,7 +1046,7 @@ int find_chunks(int tst)
 		/* For all other windows */
 		if (j > 1) {
 			twin.start = wnxt;
-			wnxt += WIN_SZ;
+			wnxt += WIN_SZ_PAGES;
 			twin.end = wnxt;
 		}
 
@@ -1111,7 +1111,7 @@ static int find_ticks_for_test(int tst)
 
 	/* Set the number of iterations. We only do 1/2 of the iterations */
 	/* on the first pass */
-	if (vv->pass == 0) {
+	if (v->pass == 0) {
 		iter = tseq[tst].iter/FIRST_DIVISER;
 	} else {
 		iter = tseq[tst].iter;

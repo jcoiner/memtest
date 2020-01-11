@@ -36,12 +36,12 @@ struct mem_info_t {
 };
 
 typedef unsigned long ulong;
-#define STACKSIZE       (8*1024)
-#define MAX_MEM         0x7FF00000      /* 8 TB */
-#define WIN_SZ          0x80000         /* 2 GB */
-#define UNMAP_SZ        (0x100000-WIN_SZ)  /* Size of umappped first segment */
+#define STACKSIZE       (8*1024)        /* Units are bytes */
+#define MAX_MEM_PAGES   0x7FF00000      /* 8 TB. Units are 4K pages */
+#define WIN_SZ_PAGES    0x80000         /* 2 GB. Units are 4K pages */
+#define UNMAP_SZ_PAGES  (0x100000-WIN_SZ_PAGES)  /* Size of unmapped first segment */
 
-#define SPINSZ		0x4000000	/* 256 MB */
+#define SPINSZ_DW	0x4000000	/* 256 MB in DWords */
 #define MOD_SZ		20
 #define BAILOUT		if (bail) return(1);
 #define BAILR		if (bail) return;
@@ -136,6 +136,11 @@ void movinvr(int cpu);
 void movinv32(int iter, ulong p1, ulong lb, ulong mb, int sval, int off,
 	int cpu);
 void modtst(int off, int iter, ulong p1, ulong p2, int cpu);
+#define ASSERT(n) do {                   \
+    if (!(n)) {                          \
+        assert_fail(__FILE__, __LINE__); \
+    } } while(0)
+void assert_fail(const char* file, int line_no);
 void error(ulong* adr, ulong good, ulong bad);
 void ad_err1(ulong *adr1, ulong *adr2, ulong good, ulong bad);
 void ad_err2(ulong *adr, ulong bad);
@@ -180,8 +185,8 @@ void clear_screen(void);
 void paging_off(void);
 void show_spd(void);
 int map_page(unsigned long page);
-void *mapping(unsigned long page_address);
-void *emapping(unsigned long page_address);
+void *mapping(unsigned long page_address /* physical page number */);
+void *emapping(unsigned long page_address /* physical page number */);
 int isdigit(char c);
 ulong memspeed(ulong src, ulong len, int iter);
 unsigned long page_of(void *ptr);
@@ -226,21 +231,21 @@ static inline void cache_on(void)
 
 struct mmap {
 	ulong pbase_addr;
-	ulong *start;
-	ulong *end;
+	ulong *start;     // VA of segment start
+	ulong *end;       // VA of the last dword within the segment
 };
 
 struct pmap {
-	ulong start;
+	ulong start;      // Physical 4K page number
 	ulong end;
 };
 
 struct tseq {
-	short sel;
-	short cpu_sel;
-	short pat;
-	short iter;
-	short errors;
+	short sel;        // test enabled boolean
+	short cpu_sel;    // cpu_sel == 0 indicates the end of tseq[] array
+	short pat;        // the test #
+	short iter;       // # of iterations to run
+	short errors;     // error count, updated as tests run
 	char *msg;
 };
 
@@ -275,7 +280,7 @@ struct vars {
 	int msg_line;
 	int ecount;
 	int ecc_ecount;
-	int msegs;
+	int msegs;      // Number of entries in pmap[]
 	int testsel;
 	int scroll_start;
 	int pass_ticks;
@@ -283,10 +288,12 @@ struct vars {
 	int pptr;
 	int tptr;
 	struct err_info erri;
+	// PA ranges from the e820 table:
 	struct pmap pmap[MAX_MEM_SEGMENTS];
+	// Virtual mappings:
 	volatile struct mmap map[MAX_MEM_SEGMENTS];
-	ulong plim_lower;
-	ulong plim_upper;
+	ulong plim_lower;  // Physical page number
+	ulong plim_upper;  // Physical page number
 	ulong clks_msec;
 	ulong starth;
 	ulong startl;

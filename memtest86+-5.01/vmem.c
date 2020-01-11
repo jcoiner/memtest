@@ -116,10 +116,12 @@ void *mapping(unsigned long page_addr)
 {
 	void *result;
 	if (page_addr < 0x80000) {
-		/* If the address is less than 1GB directly use the address */
+		/* If the page is below 2GB, address it directly */
 		result = (void *)(page_addr << 12);
 	}
 	else {
+		// Higher physical pages map to a virtual address
+		// in the 2G-4G range.
 		unsigned long alias;
 		alias = page_addr & 0x7FFFF;
 		alias += 0x80000;
