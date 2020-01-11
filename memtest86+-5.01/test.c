@@ -45,7 +45,8 @@ void poll_errors();
 
 static const void* const nullptr = 0x0;
 
-// Writes *start and *end with the VA range to test.
+// Writes *start and *end with the VA range to test;
+// *end will point to the last dword within the chunk.
 //
 // me - this threads CPU number
 // j - index into v->map for current segment we are testing
