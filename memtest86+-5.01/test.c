@@ -18,15 +18,10 @@
 extern struct cpu_ident cpu_id;
 extern volatile int    mstr_cpu;
 extern volatile int    run_cpus;
-extern volatile int    test;
 extern volatile int segs, bail;
-extern int test_ticks, nticks;
-extern struct tseq tseq[];
-extern void update_err_counts(void);
-extern void print_err_counts(void);
+
 void rand_seed( unsigned int seed1, unsigned int seed2, int me);
 ulong rand(int me);
-void poll_errors();
 
 // NOTE(jcoiner):
 //  Defining 'STATIC' to empty string results in crashes. It should
@@ -106,7 +101,7 @@ STATIC void foreach_segment
 	// 'end' may be exactly 0xfffffffc, right at the 4GB boundary.
 	//
 	// To avoid overflow in our loop tests and length calculations,
-	// use dword indices (the '_dw' vars) to avoid overflows.
+	// use dword indices to avoid overflows.
 	ulong start_dw = ((ulong)start) >> 2;
 	ulong   end_dw = ((ulong)  end) >> 2;
 
