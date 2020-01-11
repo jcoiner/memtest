@@ -182,7 +182,7 @@ STATIC void sliced_foreach_segment
 	}
 }
 
-STATIC void addr_tst1_seg(ulong* restrict buf,
+STATIC void addr_tst1_seg(ulong* buf,
                           ulong len_dw, const void* unused) {
 	// Within each segment:
 	//  - choose a low dword offset 'off'
@@ -670,7 +670,7 @@ typedef struct {
 	int off;
 } movinv32_ctx;
 
-STATIC void movinv32_init(ulong* restrict buf,
+STATIC void movinv32_init(ulong* buf,
                           ulong len_dw, const void* vctx) {
 	const movinv32_ctx* ctx = (const movinv32_ctx*)vctx;
 
@@ -720,7 +720,7 @@ STATIC void movinv32_init(ulong* restrict buf,
 		 );
 }
 
-STATIC void movinv32_bottom_up(ulong* restrict buf, ulong len_dw,
+STATIC void movinv32_bottom_up(ulong* buf, ulong len_dw,
                                const void* vctx) {
 	const movinv32_ctx* ctx = (const movinv32_ctx*)vctx;
 
@@ -806,7 +806,7 @@ STATIC void movinv32_bottom_up(ulong* restrict buf, ulong len_dw,
 		 );
 }
 
-STATIC void movinv32_top_down(ulong* restrict buf,
+STATIC void movinv32_top_down(ulong* buf,
                               ulong len_dw, const void* vctx) {
 	const movinv32_ctx* ctx = (const movinv32_ctx*)vctx;
 
@@ -964,7 +964,7 @@ typedef struct {
 	ulong p2;
 } modtst_ctx;
 
-STATIC void modtst_sparse_writes(ulong* restrict start,
+STATIC void modtst_sparse_writes(ulong* start,
                                  ulong len_dw, const void* vctx) {
 	const modtst_ctx* ctx = (const modtst_ctx*)vctx;
 	ulong p1 = ctx->p1;
@@ -992,7 +992,7 @@ STATIC void modtst_sparse_writes(ulong* restrict start,
 #endif
 }
 
-STATIC void modtst_dense_writes(ulong* restrict start, ulong len_dw,
+STATIC void modtst_dense_writes(ulong* start, ulong len_dw,
                                 const void* vctx) {
 	const modtst_ctx* ctx = (const modtst_ctx*)vctx;
 	ulong p2 = ctx->p2;
@@ -1037,7 +1037,7 @@ STATIC void modtst_dense_writes(ulong* restrict start, ulong len_dw,
 #endif
 }
 
-STATIC void modtst_check(ulong* restrict start,
+STATIC void modtst_check(ulong* start,
                          ulong len_dw, const void* vctx) {
 	const modtst_ctx* ctx = (const modtst_ctx*)vctx;
 	ulong p1 = ctx->p1;
@@ -1170,7 +1170,7 @@ STATIC ulong block_move_normalize_len_dw(ulong len_dw) {
 	return result;
 }
 
-STATIC void block_move_init(ulong* restrict buf,
+STATIC void block_move_init(ulong* buf,
                             ulong len_dw, const void* unused_ctx) {
 	len_dw = block_move_normalize_len_dw(len_dw);
 
@@ -1271,7 +1271,7 @@ typedef struct {
 	int me;
 } block_move_ctx;
 
-STATIC void block_move_move(ulong* restrict buf,
+STATIC void block_move_move(ulong* buf,
                             ulong len_dw, const void* vctx) {
 	const block_move_ctx* ctx = (const block_move_ctx*)vctx;
 	ulong iter = ctx->iter;
@@ -1351,7 +1351,7 @@ STATIC void block_move_move(ulong* restrict buf,
 	}
 }
 
-STATIC void block_move_check(ulong* restrict buf,
+STATIC void block_move_check(ulong* buf,
                              ulong len_dw, const void* unused_ctx) {
 	len_dw = block_move_normalize_len_dw(len_dw);
 
@@ -1436,7 +1436,7 @@ typedef struct {
 	ulong pat;
 } bit_fade_ctx;
 
-STATIC void bit_fade_fill_seg(ulong* restrict p,
+STATIC void bit_fade_fill_seg(ulong* p,
                               ulong len_dw, const void* vctx) {
 	const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
 	ulong pat = ctx->pat;
@@ -1460,7 +1460,7 @@ void bit_fade_fill(ulong p1, int me)
 	unsliced_foreach_segment(&ctx, me, bit_fade_fill_seg);
 }
 
-STATIC void bit_fade_chk_seg(ulong* restrict p,
+STATIC void bit_fade_chk_seg(ulong* p,
                              ulong len_dw, const void* vctx) {
 	const bit_fade_ctx* ctx = (const bit_fade_ctx*)vctx;
 	ulong pat = ctx->pat;
