@@ -33,9 +33,9 @@ struct ascii_map_str {
         int keycode;
 };
 
-inline void reboot(void)
+void reboot(void)
 {
-	
+
 	/* tell the BIOS to do a cold start */
 	*((unsigned short *)0x472) = 0x0;
 	

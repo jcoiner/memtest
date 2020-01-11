@@ -29,6 +29,42 @@ static void common_err();
 static int syn, chan, len=1;
 
 /*
+ * Change the color of msg_line to vga_color
+ */
+static void paint_line(int msg_line, unsigned vga_color) {
+    if (msg_line < 24) {
+        char* pp;
+        int i;
+        for(i=0, pp=(char *)((SCREEN_ADR+msg_line*160+1));
+            i<76; i++, pp+=2) {
+            *pp = vga_color;
+        }
+    }
+}
+
+/*
+ * Report an assertion failure.
+ * This is not a memory error, so report it in a different color.
+ */
+void assert_fail(const char* file, int line_no) {
+     spin_lock(&barr->mutex);
+
+     scroll();
+     cprint(vv->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
+     dprint(vv->msg_line, 31, line_no, 5, 1);
+     cprint(vv->msg_line, 37, file);
+     paint_line(vv->msg_line, 0x0E /* yellow on black */);
+
+     spin_unlock(&barr->mutex);
+
+     // Keep the message on-screen for a while before it scrolls away.
+     // Assert-fails should be rare and may indicate that subsequent
+     // results aren't valid. (Consider waiting for keypress before
+     // continuing?)
+     sleep(60, 0, 0, 0);
+}
+
+/*
  * Display data error message. Don't display duplicate errors.
  */
 void error(ulong *adr, ulong good, ulong bad)
@@ -113,9 +149,6 @@ static void update_err_counts(void)
 
 static void print_err_counts(void)
 {
-	int i;
-	char *pp;
-
 	if ((v->ecount > 4096) && (v->ecount % 256 != 0)) return;
 
 	dprint(LINE_INFO, 72, v->ecount, 6, 0);
@@ -125,13 +158,9 @@ static void print_err_counts(void)
 
 	/* Paint the error messages on the screen red to provide a vivid */
 	/* indicator that an error has occured */ 
-	if ((v->printmode == PRINTMODE_ADDRESSES ||
-			v->printmode == PRINTMODE_PATTERNS) &&
-			v->msg_line < 24) {
-		for(i=0, pp=(char *)((SCREEN_ADR+v->msg_line*160+1));
-				 i<76; i++, pp+=2) {
-			*pp = 0x47;
-		}
+	if (vv->printmode == PRINTMODE_ADDRESSES ||
+	    vv->printmode == PRINTMODE_PATTERNS) {
+		paint_line(vv->msg_line, 0x47 /* gray on red */);
 	}
 }
 

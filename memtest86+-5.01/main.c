@@ -74,7 +74,6 @@ short		onepass;
 volatile short	btflag = 0;
 volatile int	test;
 short	        restart_flag;
-bool	        reloc_pending = FALSE;
 uint8_t volatile stacks[MAX_CPUS][STACKSIZE];
 int 		bitf_seq = 0;
 char		cmdline_parsed = 0;
@@ -87,7 +86,7 @@ volatile int 	segs;
 static int	ltest;
 static int	pass_flag = 0;
 volatile short	start_seq = 0;
-static int	c_iter;
+static int	c_iter;                 /* Number of entries in v->map[] */
 ulong 		high_test_adr;
 volatile static int window;
 volatile static unsigned long win_next;
@@ -250,20 +249,6 @@ switch_to_main_stack(unsigned cpu_num)
 		: /*no output*/
 		: "a" (offs) : "memory" 
 	);
-}
-
-void reloc_internal(int cpu)
-{
-	/* clear variables */
-        reloc_pending = FALSE;
-
-	run_at(LOW_TEST_ADR, cpu);
-}
-
-void reloc(void)
-{
-	bail++;
-        reloc_pending = TRUE;
 }
 
 /* command line passing using the 'old' boot protocol */
@@ -546,7 +531,7 @@ void test_start(void)
 	    test_setup();
 
 	    /* Loop through all possible windows */
-	    while (win_next <= ((ulong)v->pmap[v->msegs-1].end + WIN_SZ)) {
+	    while (win_next <= ((ulong)v->pmap[v->msegs-1].end + WIN_SZ_PAGES)) {
 
 		/* Main scheduling barrier */
 		cprint(8, my_cpu_num+7, "W");
@@ -554,7 +539,7 @@ void test_start(void)
 		barrier();
 
 		/* Don't go over the 8TB PAE limit */
-		if (win_next > MAX_MEM) {
+		if (win_next > MAX_MEM_PAGES) {
 			break;
 		}
 
@@ -638,11 +623,6 @@ void test_start(void)
 		cprint(8, my_cpu_num+7, "-");
 		btrace(my_cpu_num, __LINE__, "Sched_Win0",1,window,win_next);
 
-		/* Do we need to exit */
-		if(reloc_pending) {
-		    reloc_internal(my_cpu_num);
-	 	}
-
 		if (my_cpu_ord == mstr_cpu) {
 		    switch (window) {
 		    /* Special case for relocation */
@@ -654,14 +634,14 @@ void test_start(void)
 		    /* Special case for first segment */
 		    case 1:
 			winx.start = win0_start;
-			winx.end = WIN_SZ;
-			win_next += WIN_SZ;
+			winx.end = WIN_SZ_PAGES;
+			win_next += WIN_SZ_PAGES;
 			window++;
 			break;
 		    /* For all other windows */
 		    default:
 			winx.start = win_next;
-			win_next += WIN_SZ;
+			win_next += WIN_SZ_PAGES;
 			winx.end = win_next;
 		    }
 		    btrace(my_cpu_num,__LINE__,"Sched_Win1",1,winx.start,
@@ -897,7 +877,7 @@ int do_test(int my_ord)
 			/* Switch patterns */
 			s_barrier();
 			movinv1(c_iter,p2,p1, my_ord);
-			BAILOUT
+			BAILOUT;
 		}
 		break;
 		
@@ -935,11 +915,11 @@ int do_test(int my_ord)
 		for (i=0, p1=1; p1; p1=p1<<1, i++) {
 			s_barrier();
 			movinv32(c_iter,p1, 1, 0x80000000, 0, i, my_ord);
-			BAILOUT
+			BAILOUT;
 			s_barrier();
 			movinv32(c_iter,~p1, 0xfffffffe,
 				0x7fffffff, 1, i, my_ord);
-			BAILOUT
+			BAILOUT;
 		}
 		break;
 
@@ -958,12 +938,12 @@ int do_test(int my_ord)
 				p2 = ~p1;
 				s_barrier();
 				modtst(i, 2, p1, p2, my_ord);
-				BAILOUT
+				BAILOUT;
 
 				/* Switch patterns */
 				s_barrier();
 				modtst(i, 2, p2, p1, my_ord);
-				BAILOUT
+				BAILOUT;
 			}
 		}
 		break;
@@ -1008,13 +988,13 @@ int do_test(int my_ord)
 		for (i=0; i<MOD_SZ; i++) {
 			p2 = ~p1;
 			modtst(i, c_iter, p1, p2, my_ord);
-			BAILOUT
+			BAILOUT;
 
 			/* Switch patterns */
 			p2 = p1;
 			p1 = ~p2;
 			modtst(i, c_iter, p1,p2, my_ord);
-			BAILOUT
+			BAILOUT;
 		}
 		break;
 
@@ -1025,13 +1005,13 @@ int do_test(int my_ord)
 			for (i=0; i<MOD_SZ; i++) {
 				p2 = ~p1;
 				modtst(i, c_iter, p1, p2, my_ord);
-				BAILOUT
+				BAILOUT;
 
 				/* Switch patterns */
 				p2 = p1;
 				p1 = ~p2;
 				modtst(i, c_iter, p1, p2, my_ord);
-				BAILOUT
+				BAILOUT;
 			}
 		}
 		break;
@@ -1039,16 +1019,16 @@ int do_test(int my_ord)
 	return(0);
 }
 
-/* Compute number of SPINSZ chunks being tested */
+/* Compute number of SPINSZ_DW chunks being tested */
 int find_chunks(int tst) 
 {
 	int i, j, sg, wmax, ch;
 	struct pmap twin={0,0};
-	unsigned long wnxt = WIN_SZ;
+	unsigned long wnxt = WIN_SZ_PAGES;
 	unsigned long len;
 
-	wmax = MAX_MEM/WIN_SZ+2;  /* The number of 2 GB segments +2 */
-	/* Compute the number of SPINSZ memory segments */
+	wmax = MAX_MEM_PAGES/WIN_SZ_PAGES+2;  /* The number of 2 GB segments +2 */
+	/* Compute the number of SPINSZ_DW memory segments */
 	ch = 0;
 	for(j = 0; j < wmax; j++) {
 		/* special case for relocation */
@@ -1060,7 +1040,7 @@ int find_chunks(int tst)
 		/* special case for first 2 GB */
 		if (j == 1) {
 			twin.start = win0_start;
-			twin.end = WIN_SZ;
+			twin.end = WIN_SZ_PAGES;
 		}
 
 		/* For all other windows */
@@ -1091,7 +1071,7 @@ int find_chunks(int tst)
 				    break;
 				}
 			}
-			ch += (len + SPINSZ -1)/SPINSZ;
+			ch += (len + SPINSZ_DW -1)/SPINSZ_DW;
 		}
 	}
 	return(ch);
@@ -1120,70 +1100,96 @@ void find_ticks_for_pass(void)
 
 static int find_ticks_for_test(int tst)
 {
-	int ticks=0, c, ch;
+	int ticks=0, iter, ch;
 
 	if (tseq[tst].sel == 0) {
 		return(0);
 	}
 
-	/* Determine the number of chunks for this test */
+	/* Determine the number of SPINSZ chunks for this test */
 	ch = find_chunks(tst);
 
 	/* Set the number of iterations. We only do 1/2 of the iterations */
-        /* on the first pass */
-	if (v->pass == 0) {
-		c = tseq[tst].iter/FIRST_DIVISER;
+	/* on the first pass */
+	if (vv->pass == 0) {
+		iter = tseq[tst].iter/FIRST_DIVISER;
 	} else {
-		c = tseq[tst].iter;
+		iter = tseq[tst].iter;
 	}
 
 	switch(tseq[tst].pat) {
 	case 0: /* Address test, walking ones */
-		ticks = 2;
+		ticks = ch;
 		break;
 	case 1: /* Address test, own address */
 	case 2:
-		ticks = 2;
+		ticks = ch * 2;
 		break;
 	case 3: /* Moving inversions, all ones and zeros */
-	case 4:
-		ticks = 2 + 4 * c;
-		break;
-	case 5: /* Moving inversions, 8 bit walking ones and zeros */
-		ticks = 24 + 24 * c;
-		break;
-	case 6: /* Random Data */
-		ticks = c + 4 * c;
-		break;
-	case 7: /* Block move */
-		ticks = (ch + ch/act_cpus + c*ch);
-		break;
-	case 8: /* Moving inversions, 32 bit shifting pattern */
-		ticks = (1 + c * 2) * 64;
-		break;
-	case 9: /* Random Data Sequence */
-		ticks = 3 * c;
-		break;
-	case 10: /* Modulo 20 check, Random pattern */
-		ticks = 4 * 40 * c;
-		break;
-	case 11: /* Bit fade test */
-		ticks = c * 2 + 4 * ch;
-		break;
-	case 90: /* Modulo 20 check, all ones and zeros (unused) */
-		ticks = (2 + c) * 40;
-		break;
-	case 91: /* Modulo 20 check, 8 bit pattern (unused) */
-		ticks = (2 + c) * 40 * 8;
+	case 4: {
+		const int each_movinv1 = ch * (1 + 2 * iter);  // each movinv1()
+		ticks = 2 * each_movinv1;                      // which we call twice
 		break;
 	}
+	case 5: { /* Moving inversions, 8 bit walking ones and zeros */
+		const int each_movinv1 = ch * (1 + 2 * iter);  // same as above
+		ticks = 16 * each_movinv1;               // but here we call it 16x
+		break;
+	}
+	case 6: { /* Random Data */
+		const int each_movinv1 = ch * 5;   // movinv1() does only 5 ticks here
+		ticks = iter * each_movinv1;       // and we call it 'iter' times.
+		break;
+	}
+	case 7: /* Block move */
+		ticks = ch * (2 + iter);
+		break;
+	case 8: { /* Moving inversions, 32 bit shifting pattern */
+		const int each_movinv32 = ch * (1 + 2 * iter);  // Each movinv32()
+		ticks = each_movinv32 * 64;                     // We call it 64x
+		break;
+	}
+	case 9: { /* Random Data Sequence */
+		const int each_movinvr = 3 * ch; // Each movinvr() ticks 3*ch times
+		ticks = each_movinvr * iter;     // We call it iter times
+		break;
+	}
+	case 10: { /* Modulo 20 check, Random pattern */
+		const int each_modtst = ch * 4;
+		ticks = iter * MOD_SZ * each_modtst;
+		break;
+	}
+	case 11: { /* Bit fade test */
+		// Each call to bit_fade_fill() and bit_fade_chk() ticks ch times.
+		const int each_bit_fade_fill = ch;
+		const int each_bit_fade_chk  = ch;
+		// We call each twice: fill 0s, check, fill 1s, check.
+		const int loop_ticks = 2 * each_bit_fade_chk + 2 * each_bit_fade_fill;
+		// We also sleep for '2*iter' seconds and tick once per second
+		const int sleep_ticks = iter * 2;
+		ticks = loop_ticks + sleep_ticks;
+		break;
+	}
+	case 90: { /* Modulo 20 check, all ones and zeros (unused) */
+		const int each_modtst = ch * (2 + iter);
+		ticks = each_modtst * 2 * MOD_SZ;
+		break;
+	}
+	case 91: { /* Modulo 20 check, 8 bit pattern (unused) */
+		const int each_modtst = ch * (2 + iter);
+		ticks = each_modtst * 2 * MOD_SZ * 8;
+		break;
+	}
+	default:
+		ASSERT(0);
+		break;
+	}
+
 	if (cpu_mode == CPM_SEQ || tseq[tst].cpu_sel == -1) {
 		ticks *= act_cpus;
 	}
-	if (tseq[tst].pat == 7 || tseq[tst].pat == 11) {
-		return ticks;
-	}
-	return ticks*ch;
+
+	return ticks;
 }
 
 static int compute_segments(struct pmap win, int me)
