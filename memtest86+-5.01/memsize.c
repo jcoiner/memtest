@@ -8,22 +8,18 @@
 #include "defs.h"
 #include "config.h"
 
-short e820_nr;
+short e820_nr = 0;
 short memsz_mode = SZ_MODE_BIOS;
 
-static ulong alt_mem_k;
-static ulong ext_mem_k;
+static ulong alt_mem_k = 0;
+static ulong ext_mem_k = 0;
 static struct e820entry e820[E820MAX];
 
-ulong p1, p2;
-ulong *p;
-
 static void sort_pmap(void);
-//static void memsize_bios(void);
 static void memsize_820(void);
 static void memsize_801(void);
 static int sanitize_e820_map(struct e820entry *orig_map,
-struct e820entry *new_bios, short old_nr);
+                             struct e820entry *new_bios, short old_nr);
 static void memsize_linuxbios();
 
 /*
