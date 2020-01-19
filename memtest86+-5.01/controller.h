@@ -17,7 +17,6 @@ void find_controller(void);
 void poll_errors(void);
 void set_ecc_polling(int val);
 void coretemp(void);
-extern struct pci_memory_controller controllers[];
 
 
 #endif /* MEMTEST_CONTROLLER_H */

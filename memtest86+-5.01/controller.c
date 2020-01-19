@@ -18,7 +18,9 @@
 
 int col, col2;
 int nhm_bus = 0x3F;
-	
+
+static const struct pci_memory_controller controllers[];
+
 extern ulong extclock;
 extern unsigned long imc_type;
 extern struct cpu_ident cpu_id;
@@ -957,6 +959,9 @@ static void setup_i925(void)
 
 static void setup_p35(void)
 {
+	// NOTE(jcoiner): This routine is where a ThinkPad T400 reboots,
+	// if not run in Fail-Safe mode. The T400 has an [8086:2a40]
+	// memory controller.
 
 	// Activate MMR I/O
 	ulong dev0, capid0;
@@ -3862,7 +3867,7 @@ static void poll_timings_ct(void)
 /* ------------------ Let's continue ------------------ */
 /* ---------------------------------------------------- */
 
-struct pci_memory_controller controllers[] = {
+static const struct pci_memory_controller controllers[] = {
 	/* Default unknown chipset */
 	{ 0, 0, "","",                    0, poll_fsb_nothing, poll_timings_nothing, setup_nothing, poll_nothing },
 
@@ -4099,7 +4104,7 @@ void find_controller(void)
 	int result;
 	result = pci_conf_read(ctrl.bus, ctrl.dev, ctrl.fn, PCI_VENDOR_ID, 2, &vendor);
 	result = pci_conf_read(ctrl.bus, ctrl.dev, ctrl.fn, PCI_DEVICE_ID, 2, &device);
-	
+
 	// Detect IMC by CPUID
 	if(imc_type) { vendor = 0xFFFF; device = imc_type; }
 	if(v->fail_safe & 1) { vendor = 0xFFFF; device = 0xFFFF; }
@@ -4107,22 +4112,22 @@ void find_controller(void)
 	//hprint(11,0,vendor); hprint(11,10,device);
 		
 	ctrl.index = 0;	
-		if (result == 0 || imc_type) {
-			for(i = 1; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
-				if ((controllers[i].vendor == vendor) && (controllers[i].device == device)) {
-					ctrl.index = i;
-					break;
-				}
+        if (result == 0 || imc_type) {
+		for(i = 1; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
+			if ((controllers[i].vendor == vendor) && (controllers[i].device == device)) {
+				ctrl.index = i;
+				break;
 			}
 		}
-	
+        }
+
 	controllers[ctrl.index].setup_ecc();
 	/* Don't enable ECC polling by default unless it has
 	 * been well tested.
 	 */
 	//set_ecc_polling(-1);
 	print_memory_controller();
-	
+
 	if(imc_type) { print_dmi_startup_info(); }
 
 }

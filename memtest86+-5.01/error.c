@@ -42,26 +42,61 @@ static void paint_line(int msg_line, unsigned vga_color) {
     }
 }
 
+
+/* Sleep for N seconds */
+static void assert_sleep(long n_sec)
+{
+	ulong sh, sl, l, h, t;
+
+	/* save the starting time */
+	asm __volatile__("rdtsc":"=a" (sl),"=d" (sh));
+
+	// Not calibrated, so this might be wrong...
+	// Hardcoding this allows calling assert before we calibrate
+	// v->clks_msec.
+	const ulong clks_msec = 2000000;
+	/* loop for n_sec seconds */
+	while (1) {
+		asm __volatile__(
+				 "rep ; nop\n\t"
+				 "rdtsc":"=a" (l),"=d" (h));
+		asm __volatile__ (
+				  "subl %2,%0\n\t"
+				  "sbbl %3,%1"
+				  :"=a" (l), "=d" (h)
+				  :"g" (sl), "g" (sh),
+				   "0" (l), "1" (h));
+
+		t = h * ((unsigned)0xffffffff / clks_msec) / 1000;
+		t += (l / clks_msec) / 1000;
+
+		/* Is the time up? */
+		if (t >= n_sec) {
+			break;
+		}
+	}
+}
+
 /*
  * Report an assertion failure.
  * This is not a memory error, so report it in a different color.
  */
 void assert_fail(const char* file, int line_no) {
-     spin_lock(&barr->mutex);
+	spin_lock(&barr->mutex);
 
-     scroll();
-     cprint(v->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
-     dprint(v->msg_line, 31, line_no, 5, 1);
-     cprint(v->msg_line, 37, file);
-     paint_line(v->msg_line, 0x0E /* yellow on black */);
+	scroll();
+	cprint(v->msg_line, 0, "  *** INTERNAL ERROR ***  line ");
+	dprint(v->msg_line, 31, line_no, 5, 1);
+	cprint(v->msg_line, 37, file);
+	paint_line(v->msg_line, 0x0E /* yellow on black */);
 
-     spin_unlock(&barr->mutex);
+	spin_unlock(&barr->mutex);
 
-     // Keep the message on-screen for a while before it scrolls away.
-     // Assert-fails should be rare and may indicate that subsequent
-     // results aren't valid. (Consider waiting for keypress before
-     // continuing?)
-     sleep(60, 0, 0, 0);
+	// Keep the message on-screen for a while before it scrolls away.
+	// Assert-fails should be rare and may indicate that subsequent
+	// results aren't valid. (Consider waiting for keypress before
+	// continuing?)
+	assert_sleep(4);
 }
 
 /*

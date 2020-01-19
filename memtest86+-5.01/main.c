@@ -399,7 +399,7 @@ void test_start(void)
 		barrier_init(1);
 		btrace(my_cpu_num, __LINE__, "Begin     ", 1, 0, 0);
 		/* Find memory size */
-		 mem_size();	/* must be called before initialise_cpus(); */
+                mem_size();	/* must be called before initialise_cpus(); */
 		/* Fill in the CPUID table */
 		get_cpuid();
 		/* Startup the other CPUs */
@@ -407,7 +407,7 @@ void test_start(void)
 		//initialise_cpus();
 		btrace(my_cpu_num, __LINE__, "BeforeInit", 1, 0, 0);
 		/* Draw the screen and get system information */
-	  init();
+                init();
 
 		/* Set defaults and initialize variables */
 		set_defaults();
@@ -422,7 +422,23 @@ void test_start(void)
 			high_test_adr = 0x2000000;
 	        } else {
 			high_test_adr = 0x300000;
-		} 
+		}
+
+                // Ensure high_test_adr is within some pmap
+                {
+                    int found = 0;
+                    int i;
+                    for(i = 0; i < v->msegs; i++) {
+                        if ((high_test_adr >= ((ulong)(v->pmap[i].start) << 12)) &&
+                            (high_test_adr +  (ulong)(_end - _start) <=
+                             ((ulong)(v->pmap[i].end) << 12))) {
+                            found = 1;
+                            break;
+                        }
+                    }
+                    ASSERT(found);
+                }
+
 		win1_end = (high_test_adr >> 12);
 
 		/* Adjust the map to not test the page at 939k,
